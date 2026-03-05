@@ -422,3 +422,130 @@ import Seo from './components/Seo.client';
 ```
 
 **Source:** `src/components/Seo.client.jsx:21`
+
+---
+
+## ButtonSelectedVariantAddToCart
+
+Wrapper around Hydrogen's `<Product.SelectedVariant.AddToCartButton />` that displays a disabled "Sold out" button when the variant is not available.
+
+<ParamField path="showSoldOut" type="boolean" default={true}>
+  Whether to show the button when product is sold out
+</ParamField>
+
+<ParamField path="small" type="boolean" default={false}>
+  Use smaller button size (p-3 text-xs instead of p-4 text-sm)
+</ParamField>
+
+### Features
+- Automatically checks variant availability
+- Shows "Sold out" text when unavailable
+- Can hide button completely when sold out (`showSoldOut={false}`)
+- Styled with Tailwind CSS (dark background, white text)
+- Disabled state with reduced opacity
+
+### Usage Example
+
+```jsx src/components/ButtonSelectedVariantAddToCart.client.jsx
+import ButtonSelectedVariantAddToCart from './components/ButtonSelectedVariantAddToCart.client';
+import {Product} from '@shopify/hydrogen/client';
+
+<Product product={shopifyProduct}>
+  <ButtonSelectedVariantAddToCart />
+  
+  {/* Or with custom props */}
+  <ButtonSelectedVariantAddToCart 
+    showSoldOut={false}
+    small
+  />
+</Product>
+```
+
+**Source:** `src/components/ButtonSelectedVariantAddToCart.client.jsx:7`
+
+---
+
+## ButtonSelectedVariantBuyNow
+
+Similar to `ButtonSelectedVariantAddToCart` but opens checkout immediately instead of adding to cart.
+
+<ParamField path="showSoldOut" type="boolean" default={true}>
+  Whether to show the button when product is sold out
+</ParamField>
+
+<ParamField path="small" type="boolean" default={false}>
+  Use smaller button size
+</ParamField>
+
+### Features
+- Opens Shopify checkout in new window
+- Uses direct checkout link for selected variant
+- Same sold-out handling as AddToCart button
+- Styled consistently with other action buttons
+
+### Usage Example
+
+```jsx src/components/ButtonSelectedVariantBuyNow.client.jsx
+import ButtonSelectedVariantBuyNow from './components/ButtonSelectedVariantBuyNow.client';
+import {Product} from '@shopify/hydrogen/client';
+
+<Product product={shopifyProduct}>
+  <ButtonSelectedVariantBuyNow />
+</Product>
+```
+
+**Source:** `src/components/ButtonSelectedVariantBuyNow.client.jsx:7`
+
+---
+
+## Context Providers
+
+### CartUIProvider
+
+Manages cart UI state (open/closed) and provides methods to control cart visibility.
+
+#### Exports
+- `CartUIProvider` - Provider component
+- `useCartUI()` - Hook to access cart UI context
+
+#### Context Value
+
+<ResponseField name="isCartOpen" type="boolean">
+  Whether the cart panel is currently open
+</ResponseField>
+
+<ResponseField name="openCart" type="function">
+  Function to open the cart panel
+</ResponseField>
+
+<ResponseField name="closeCart" type="function">
+  Function to close the cart panel
+</ResponseField>
+
+<ResponseField name="toggleCart" type="function">
+  Function to toggle cart open/closed state
+</ResponseField>
+
+#### Usage Example
+
+```jsx src/contexts/CartUIProvider.client.jsx
+import CartUIProvider, { useCartUI } from './contexts/CartUIProvider.client';
+
+// Wrap your app
+<CartUIProvider>
+  {children}
+</CartUIProvider>
+
+// Use in components
+function MyComponent() {
+  const { isCartOpen, openCart, closeCart } = useCartUI();
+  
+  return (
+    <button onClick={openCart}>
+      Open Cart
+    </button>
+  );
+}
+```
+
+**Source:** `src/contexts/CartUIProvider.client.jsx:11`
