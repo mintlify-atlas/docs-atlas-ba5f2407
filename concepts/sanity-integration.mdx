@@ -1,0 +1,388 @@
+---
+title: Sanity Integration
+description: How Sanity CMS is integrated with Tune Me In for powerful content management
+---
+
+# Sanity Integration
+
+Sanity CMS provides the content management layer for Tune Me In, enabling rich editorial experiences that seamlessly reference Shopify products.
+
+## Overview
+
+Sanity stores:
+
+- **Content Pages** - Homepage, about pages, editorial articles
+- **Product References** - Links to Shopify products with custom metadata
+- **Collections** - Curated product groupings with editorial content
+- **Media Assets** - Images with automatic optimization
+- **SEO Metadata** - Titles, descriptions, and social sharing data
+
+## Configuration
+
+Sanity is configured in `sanity.config.js:1-7`:
+
+```javascript
+export default {
+  apiVersion: 'v2021-06-07',  // Sanity API version
+  dataset: 'production',       // Dataset name
+  projectId: 'wfr1r0dw',      // Sanity project ID
+  useCdn: true,               // Use Sanity's global CDN
+};
+```
+
+This configuration is then imported and embedded in the Shopify config (`shopify.config.js:8`):
+
+```javascript
+export default {
+  // ... other config
+  sanity: sanityConfig,
+};
+```
+
+<Info>
+Using `useCdn: true` enables Sanity's global edge cache, providing fast content delivery worldwide. Set to `false` if you need real-time content updates during editing.
+</Info>
+
+## The hydrogen-plugin-sanity Package
+
+Tune Me In uses the `hydrogen-plugin-sanity` package (v0.1.1) to integrate Sanity with Hydrogen. This plugin provides:
+
+### useSanityQuery Hook
+
+The primary interface for fetching data from Sanity with automatic Shopify product resolution:
+
+```javascript
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+
+const {sanityData, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  params: {handle},
+});
+```
+
+### Key Features
+
+1. **Automatic Product Detection** - Scans Sanity responses for product references
+2. **GraphQL Integration** - Fetches referenced products from Shopify Storefront API
+3. **Normalized Response** - Returns products in an easy-to-use object map
+4. **Customizable Fragments** - Control which Shopify fields to fetch
+
+## Document Types
+
+While the Studio schema lives in a separate repository, Tune Me In queries several document types:
+
+### Product References
+
+Products are referenced using the `productWithVariant` pattern (`fragments/productWithVariant.js:3-11`):
+
+```javascript
+export const PRODUCT_WITH_VARIANT = groq`
+  product->{
+    _id,
+    "available": !store.isDeleted && store.status == 'active',
+    "slug": store.slug.current,
+    store,
+    "variantId": coalesce(^.variant->store.id, store.variants[0]->store.id)
+  }
+`;
+```
+
+This fragment:
+- References the product document (`product->`)
+- Checks availability status
+- Includes the product slug for routing
+- Resolves the selected variant (or defaults to first variant)
+
+### Homepage (`_id: 'home3'`)
+
+The homepage document includes:
+
+```javascript
+*[_id == 'home3'][0] {
+  title,
+  mainHero {
+    title,
+    bgImage { ... },
+    carousel[] { ... }
+  },
+  featuredCollection1 {
+    title,
+    products[] {
+      'productData': productWithVariant { ... }
+    }
+  },
+  // ... more sections
+}
+```
+
+### Collections
+
+Collection documents from `pages/collections/[handle].server.jsx:94-105`:
+
+```javascript
+*[
+  _type == 'collection'
+  && slug.current == $slug
+][0]{
+  ${COLLECTION_PAGE}
+} {
+  ...,
+  "totalProducts": count(products[available]),
+  products[available][$start..$end]
+}
+```
+
+<Note>
+Collections support pagination using GROQ's array slicing syntax `[$start..$end]`.
+</Note>
+
+### Articles
+
+From `pages/[handle].server.jsx:53-66`:
+
+```javascript
+*[
+  _type == 'article.info'
+  && slug.current == $slug
+][0]{
+  body[]{
+    ${PORTABLE_TEXT}
+  },
+  seo { ... },
+  title,
+}
+```
+
+## GROQ Queries
+
+Sanity uses GROQ (Graph-Relational Object Queries) as its query language.
+
+### Basic Syntax
+
+```groq
+*[_type == 'product' && store.status == 'active']
+```
+
+- `*` - Select all documents
+- `[...]` - Filter condition
+- `_type` - Built-in field for document type
+- `&&` - Logical AND operator
+
+### Projections
+
+```groq
+*[_type == 'homepage'][0] {
+  title,
+  "customField": someField.nested,
+  products[]->{
+    _id,
+    title
+  }
+}
+```
+
+- `{}` - Project specific fields
+- `"customField"` - Rename fields in response
+- `->` - Follow references
+- `[]` - Array operator
+
+### Common Patterns
+
+**Filtering by slug:**
+```groq
+*[_type == 'collection' && slug.current == $slug][0]
+```
+
+**Following references:**
+```groq
+product->{
+  _id,
+  title
+}
+```
+
+**Array slicing (pagination):**
+```groq
+products[$start..$end]
+```
+
+**Counting:**
+```groq
+"totalProducts": count(products[available])
+```
+
+**Coalescing:**
+```groq
+"variantId": coalesce(^.variant->store.id, store.variants[0]->store.id)
+```
+
+<Tip>
+The `^` operator in GROQ refers to the parent scope, useful when accessing outer context from nested queries.
+</Tip>
+
+## Portable Text
+
+Portable Text is Sanity's rich text format, stored as structured JSON.
+
+### Structure
+
+From `fragments/portableText.js:8-52`, the Portable Text fragment includes:
+
+```javascript
+export const PORTABLE_TEXT = groq`
+  ...,
+  (_type == 'blockImage') => {
+    ...,
+    image { ${IMAGE} }
+  },
+  (_type == 'blockProduct') => {
+    ...,
+    productWithVariant { ${PRODUCT_WITH_VARIANT} }
+  },
+  children[] {
+    ...,
+    (_type == 'blockInlineProduct') => {
+      ...,
+      productWithVariant { ${PRODUCT_WITH_VARIANT} }
+    },
+  },
+  markDefs[] {
+    ...,
+    (_type == 'annotationProduct') => {
+      ...,
+      productWithVariant { ${PRODUCT_WITH_VARIANT} }
+    },
+  }
+`;
+```
+
+### Custom Block Types
+
+- **`blockImage`** - Embedded images with captions
+- **`blockProduct`** - Full product cards inline
+- **`blockInlineProduct`** - Products within text flow
+- **`blockInlineProductMarginalia`** - Products in margins
+- **`annotationProduct`** - Product links within text
+
+<Info>
+Portable Text allows products to be referenced at multiple levels: as blocks, inline elements, or as annotations on text spans.
+</Info>
+
+## Image Handling
+
+Images are stored in Sanity with metadata and transformations:
+
+### Image Fragment
+
+From `fragments/image.js:13-20`:
+
+```javascript
+export const IMAGE = groq`
+  ...,
+  "altText": asset->altText,
+  "blurDataURL": asset->metadata.lqip,
+  'height': asset->metadata.dimensions.height,
+  'width': asset->metadata.dimensions.width,
+  'url': asset->url
+`;
+```
+
+This provides:
+- **Alt text** for accessibility
+- **LQIP** (Low Quality Image Placeholder) for progressive loading
+- **Dimensions** for aspect ratio calculations
+- **URL** for the full-resolution image
+
+### Image Transformations
+
+Images can be transformed via URL parameters:
+
+```jsx
+<img src={`${image.url}?w=900`} alt={image.altText} />
+```
+
+Supported transformations:
+- `w` - Width
+- `h` - Height
+- `fit` - Fit mode (clip, crop, fill, etc.)
+- `q` - Quality (1-100)
+- `fm` - Format (jpg, png, webp, etc.)
+
+## Sanity Connect for Shopify
+
+While not visible in the code, Sanity Connect is a crucial part of the architecture:
+
+1. **Automatic Sync** - Syncs Shopify products to Sanity as documents
+2. **Two-Way References** - Products in Sanity maintain references to Shopify IDs
+3. **Webhook Updates** - Product changes in Shopify trigger Sanity updates
+4. **Custom Fields** - Add editorial fields to product documents
+
+<Note>
+Sanity product documents use the ID format `shopifyProduct-{shopifyId}`, which is how `useSanityQuery` identifies products to fetch from Shopify.
+</Note>
+
+## Fragment Composition
+
+Reusable GROQ fragments keep queries DRY and maintainable:
+
+### Available Fragments
+
+- **`IMAGE`** - Standard image fields
+- **`PRODUCT_WITH_VARIANT`** - Product reference with variant
+- **`PORTABLE_TEXT`** - Rich text with all custom blocks
+- **`SEO`** - SEO metadata fields
+- **`LINKS`** - Internal and external links
+- **`PRODUCT_PAGE`** - Complete product page data
+- **`COLLECTION_PAGE`** - Complete collection page data
+
+### Usage Example
+
+```javascript
+import groq from 'groq';
+import {IMAGE} from '../fragments/image';
+import {SEO} from '../fragments/seo';
+
+const QUERY = groq`
+  *[_id == "about"][0] {
+    title,
+    image1 { ${IMAGE} },
+    image2 { ${IMAGE} },
+    seo { ${SEO} }
+  }
+`;
+```
+
+## Best Practices
+
+### Query Optimization
+
+1. **Select only needed fields** - Don't use `...` unless necessary
+2. **Use CDN for static content** - `useCdn: true` for published content
+3. **Paginate large lists** - Use array slicing for collections
+4. **Cache results** - Consider caching strategies for frequently accessed content
+
+### Product References
+
+1. **Always check availability** - Products can be deleted or deactivated
+2. **Handle missing variants** - Default to first variant if selected variant is unavailable
+3. **Use normalized IDs** - Products are keyed as `shopifyProduct-{id}`
+
+### Content Modeling
+
+1. **Reuse fragments** - Keep GROQ queries consistent
+2. **Structure for reuse** - Design documents to support multiple contexts
+3. **Plan for growth** - Consider pagination and performance early
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Shopify Integration" icon="cart-shopping" href="/concepts/shopify-integration">
+    Learn how Shopify products are fetched and displayed
+  </Card>
+  <Card title="Data Fetching" icon="database" href="/concepts/data-fetching">
+    Deep dive into the useSanityQuery hook
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand the overall system architecture
+  </Card>
+</CardGroup>

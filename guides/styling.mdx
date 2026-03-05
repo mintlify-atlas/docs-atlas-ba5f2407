@@ -1,0 +1,468 @@
+---
+title: 'Styling'
+description: 'Styling with Tailwind CSS, theming, and responsive design'
+---
+
+# Styling
+
+Tune Me In uses Tailwind CSS for styling, providing a utility-first approach to building custom designs quickly and consistently.
+
+## Tailwind Configuration
+
+The Tailwind configuration is located in `tailwind.config.js`:
+
+```js tailwind.config.js
+module.exports = {
+  purge: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+  mode: 'jit',
+  darkMode: false,
+  variants: {},
+  theme: {
+    fontFamily: {
+      second: ['Work Sans', 'sans-serif'],
+      'main-heading': ['Moniqa Black Narrow Heading'],
+      'main-display': ['Moniqa Black Narrow Display'],
+      'main-paragraph': ['Moniqa Black Narrow Paragraph'],
+    },
+    extend: {
+      screens: {
+        '3xl': '1650px',
+      },
+      colors: {
+        black: '#000000',
+        red: '#ff0000',
+        grey: '#e1e0dd',
+        primary: '#ff003c',
+        secondary: '#607d8b',
+        dark: '#2c2b2a',
+        'light-b': '#eae8e4',
+        'light-f': '#f2efea',
+        'light-ff': '#f7f4ee',
+        'product-blue': '#4a4d78',
+        'product-red': '#ea1456',
+        'product-green': '#346a1d',
+        'product-black': '#191919',
+      },
+      fontSize: {
+        huge: ['12rem', {lineHeight: '10rem'}],
+        big: ['7rem', {lineHeight: '6.5rem'}],
+      },
+      backgroundImage: {
+        soundwave: "url('/img/soundwave-small.png')",
+        logo: "url('/img/logo-2.png')",
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/aspect-ratio'),
+    require('@tailwindcss/typography'),
+  ],
+};
+```
+
+## Custom Fonts
+
+Tune Me In uses custom fonts defined in `src/index.css`:
+
+```css src/index.css
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+@font-face {
+  font-family: 'Moniqa Black Narrow Heading';
+  src: url('/fonts/Moniqa-BlackNarrowHeading.woff2') format('woff2'),
+    url('/fonts/Moniqa-BlackNarrowHeading.woff') format('woff');
+  font-weight: 900;
+  font-style: normal;
+  font-display: block; /* Fix flickering */
+}
+
+@font-face {
+  font-family: 'Moniqa Black Narrow Display';
+  src: url('/fonts/Moniqa-BlackNarrowDisplay.woff2') format('woff2'),
+    url('/fonts/Moniqa-BlackNarrowDisplay.woff') format('woff');
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Moniqa Black Narrow Paragraph';
+  src: url('/fonts/Moniqa-BlackNarrowParagraph.woff2') format('woff2'),
+    url('/fonts/Moniqa-BlackNarrowParagraph.woff') format('woff');
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-light-b font-second;
+}
+```
+
+### Using Custom Fonts
+
+```jsx
+// Heading font
+<h1 className="font-main-heading text-4xl">
+  Shop Now
+</h1>
+
+// Display font
+<div className="font-main-display text-big">
+  TUNE ME IN
+</div>
+
+// Paragraph font
+<p className="font-main-paragraph">
+  Body text content
+</p>
+
+// Secondary font (Work Sans)
+<p className="font-second">
+  Navigation and UI text
+</p>
+```
+
+## Color System
+
+Tune Me In defines a custom color palette:
+
+```jsx
+// Brand colors
+<button className="bg-primary text-white">Primary Action</button>
+<button className="bg-secondary text-white">Secondary Action</button>
+
+// Neutral colors
+<div className="bg-light-b">Light background</div>
+<div className="bg-light-f">Lighter background</div>
+<div className="bg-dark text-white">Dark section</div>
+
+// Product colors
+<span className="bg-product-blue">Blue variant</span>
+<span className="bg-product-red">Red variant</span>
+<span className="bg-product-green">Green variant</span>
+<span className="bg-product-black text-white">Black variant</span>
+```
+
+## Responsive Design
+
+Tailwind provides responsive breakpoints:
+
+```jsx
+<div className="
+  grid 
+  grid-cols-1     /* 1 column on mobile */
+  md:grid-cols-2  /* 2 columns on tablet */
+  lg:grid-cols-3  /* 3 columns on desktop */
+  3xl:grid-cols-4 /* 4 columns on ultra-wide (custom breakpoint) */
+  gap-4
+">
+  {products.map(product => (
+    <ProductCard key={product.id} product={product} />
+  ))}
+</div>
+```
+
+### Breakpoints
+
+- `sm`: 640px
+- `md`: 768px
+- `lg`: 1024px
+- `xl`: 1280px
+- `2xl`: 1536px
+- `3xl`: 1650px (custom)
+
+## Custom CSS Classes
+
+Tune Me In includes custom CSS classes for specific effects:
+
+### Header Styles
+
+```css
+.header {
+  @apply bg-transparent flex items-center justify-between h-20 p-4 fixed top-0 w-full z-50;
+}
+
+.scrolled {
+  @apply bg-light-b border-b border-dark;
+}
+```
+
+Usage:
+
+```jsx src/components/Header.server.jsx
+import {useState, useEffect} from 'react';
+
+export default function Header() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <header className={scrolled ? 'scrolled' : 'header'}>
+      {/* Header content */}
+    </header>
+  );
+}
+```
+
+### Animations
+
+```css src/index.css
+/* Marquee animation */
+.marquee {
+  white-space: nowrap;
+  position: absolute;
+  animation: marquee 10s linear infinite alternate;
+}
+
+@keyframes marquee {
+  0% { transform: translate(0, -50%); }
+  100% { transform: translate(-50%, -50%); }
+}
+
+/* Soundwave animation */
+.soundwave:active {
+  animation: soundwave 1s linear infinite;
+}
+
+@keyframes soundwave {
+  from { background-position: 0 center; }
+  to { background-position: -106px center; }
+}
+
+/* Linear wipe effect */
+.linear-wipe {
+  background: linear-gradient(to right, #333 20%, #b47000 40%, #b47000 60%, #333 80%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 5s linear infinite;
+}
+
+@keyframes shine {
+  to { background-position: 200% center; }
+}
+```
+
+Usage:
+
+```jsx
+<h1 className="linear-wipe text-6xl font-bold">
+  Special Offer!
+</h1>
+
+<div className="soundwave bg-soundwave w-full h-32" />
+
+<div className="marquee">
+  <span>TUNE ME IN • TUNE ME IN • TUNE ME IN</span>
+</div>
+```
+
+## Styling Components
+
+### Button Component
+
+```jsx src/components/Button.client.jsx
+export default function Button({children, variant = 'primary'}) {
+  const variants = {
+    primary: 'bg-black text-white hover:bg-gray-800',
+    secondary: 'bg-white text-black border border-black hover:bg-gray-100',
+    danger: 'bg-red-500 text-white hover:bg-red-600',
+  };
+
+  return (
+    <button
+      className={`
+        px-6 py-3 font-medium rounded transition-colors duration-200
+        disabled:opacity-60 disabled:cursor-not-allowed
+        ${variants[variant]}
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+### Product Card
+
+```jsx
+<div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 group">
+  <div className="aspect-w-4 aspect-h-3 overflow-hidden rounded-t-lg">
+    <img
+      src={product.image}
+      alt={product.title}
+      className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+    />
+  </div>
+  <div className="p-4">
+    <h3 className="font-medium text-lg mb-2">{product.title}</h3>
+    <p className="text-gray-600">${product.price}</p>
+  </div>
+</div>
+```
+
+## Tailwind Plugins
+
+### Aspect Ratio
+
+```jsx
+<div className="aspect-w-16 aspect-h-9">
+  <img src={image} className="object-cover" />
+</div>
+
+<div className="aspect-w-1 aspect-h-1">
+  <img src={square} className="object-cover" />
+</div>
+```
+
+### Typography
+
+```jsx
+<article className="prose lg:prose-xl max-w-none">
+  <h1>Article Title</h1>
+  <p>Article content with automatic styling...</p>
+</article>
+```
+
+## Theming
+
+To customize the theme:
+
+<Steps>
+  <Step title="Update tailwind.config.js">
+    Modify colors, fonts, and other design tokens:
+    
+    ```js
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            50: '#f0f9ff',
+            100: '#e0f2fe',
+            // ... more shades
+            900: '#0c4a6e',
+          },
+        },
+      },
+    },
+    ```
+  </Step>
+  
+  <Step title="Add custom fonts">
+    Place font files in `/public/fonts/` and define them in `src/index.css`:
+    
+    ```css
+    @font-face {
+      font-family: 'Your Custom Font';
+      src: url('/fonts/your-font.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    ```
+  </Step>
+  
+  <Step title="Update components">
+    Use your new design tokens in components:
+    
+    ```jsx
+    <button className="bg-brand-500 hover:bg-brand-600 text-white">
+      Click Me
+    </button>
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Tailwind's utility classes">
+    Prefer utility classes over custom CSS for consistency and maintainability:
+    
+    ```jsx
+    // Good
+    <div className="flex items-center justify-between p-4 bg-white">
+    
+    // Avoid
+    <div style={{display: 'flex', padding: '1rem'}}>
+    ```
+  </Accordion>
+  
+  <Accordion title="Extract repeated patterns">
+    For repeated component patterns, create reusable components:
+    
+    ```jsx
+    // Instead of repeating classes
+    function Card({children}) {
+      return (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          {children}
+        </div>
+      );
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use responsive design mobile-first">
+    Start with mobile styles and add larger breakpoints:
+    
+    ```jsx
+    <div className="text-base md:text-lg lg:text-xl">
+    ```
+  </Accordion>
+  
+  <Accordion title="Optimize for performance">
+    Tailwind's JIT mode only generates the CSS you use. Keep your classes clean and avoid dynamic class generation:
+    
+    ```jsx
+    // Good
+    const buttonClass = isActive ? 'bg-blue-500' : 'bg-gray-500';
+    
+    // Bad (won't be picked up by JIT)
+    const buttonClass = `bg-${color}-500`;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Dark Mode
+
+To add dark mode support:
+
+```js tailwind.config.js
+module.exports = {
+  darkMode: 'class', // or 'media'
+  // ...
+};
+```
+
+Then use dark mode variants:
+
+```jsx
+<div className="bg-white dark:bg-gray-900 text-black dark:text-white">
+  Content
+</div>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="cube" href="/guides/components">
+    Apply these styling techniques to your components
+  </Card>
+  <Card title="Tailwind CSS Docs" icon="book" href="https://tailwindcss.com/docs">
+    Explore more Tailwind features and utilities
+  </Card>
+</CardGroup>

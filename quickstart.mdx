@@ -1,80 +1,263 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get your Tune Me In storefront up and running in minutes with this step-by-step guide.
 ---
 
-## Get started in three steps
+Get your Tune Me In storefront running locally in just a few minutes. This guide will have you viewing your first page quickly.
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+## Before You Begin
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  You can run Tune Me In with our demo data to explore the platform before connecting your own Shopify store and Sanity project.
 </Note>
+
+Make sure you have:
+
+- **Node.js 14.0 or higher** installed on your machine
+- A code editor (we recommend VS Code)
+- Terminal access
+
+## Get Started
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the Tune Me In starter to your local machine:
+    
+    ```bash
+    git clone https://github.com/sanity-io/hydrogen-sanity-demo.git tune-me-in
+    cd tune-me-in
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required packages using your preferred package manager:
+    
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+    
+    This will install all dependencies including:
+    - `@shopify/hydrogen` - Hydrogen framework
+    - `@sanity/client` - Sanity JavaScript client
+    - `hydrogen-plugin-sanity` - Plugin for unified data fetching
+    - React, Vite, Tailwind CSS, and more
+  </Step>
+
+  <Step title="Start the Development Server">
+    Launch the development server:
+    
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
+    
+    The development server will start on `http://localhost:3000`
+  </Step>
+
+  <Step title="View Your Storefront">
+    Open your browser and navigate to:
+    
+    ```
+    http://localhost:3000
+    ```
+    
+    You should see the home page with our demo store's products and content!
+  </Step>
+</Steps>
+
+## What You'll See
+
+The demo storefront includes:
+
+- **Home Page** (`/`) - Featured collections and products with a customizable gallery
+- **Collection Pages** (`/collections/[handle]`) - Browse products by collection
+- **Product Pages** (`/products/[handle]`) - Detailed product information with variants
+- **Editorial Pages** (`/editorial/[slug]`) - Rich content pages with inline product references
+- **About Page** (`/about`) - Example of a Portable Text-powered page
+
+<Note>
+  The demo runs with test data from Sanity's demo Shopify store. You're seeing real Hydrogen and Sanity integration in action!
+</Note>
+
+## Explore the Code
+
+Now that your storefront is running, explore the key files:
+
+<CodeGroup>
+  ```jsx src/App.server.jsx
+  import {ShopifyServerProvider} from '@shopify/hydrogen';
+  import {Suspense} from 'react';
+  import shopifyConfig from '../shopify.config';
+  import Main from './components/Main.server';
+  import CartProvider from './contexts/CartProvider.client';
+
+  export default function App({...serverState}) {
+    const pages = import.meta.globEager('./pages/**/*.server.(jsx|tsx)');
+    return (
+      <Suspense>
+        <ShopifyServerProvider shopifyConfig={shopifyConfig} {...serverState}>
+          <CartProvider>
+            <Main pages={pages} serverState={serverState} />
+          </CartProvider>
+        </ShopifyServerProvider>
+      </Suspense>
+    );
+  }
+  ```
+
+  ```javascript shopify.config.js
+  import sanityConfig from './sanity.config';
+
+  export default {
+    graphqlApiVersion: 'unstable',
+    locale: 'en-us',
+    storeDomain: 'sanity-dev-store.myshopify.com',
+    storefrontToken: '791dbd01268e4a7129288e24b1012710',
+    sanity: sanityConfig,
+  };
+  ```
+
+  ```javascript sanity.config.js
+  export default {
+    apiVersion: 'v2021-06-07',
+    dataset: 'production',
+    projectId: 'wfr1r0dw',
+    useCdn: true,
+  };
+  ```
+</CodeGroup>
+
+## Try Making Changes
+
+Tune Me In uses Vite for hot module replacement. Try editing a component to see changes instantly:
+
+1. Open `src/pages/Index.server.jsx`
+2. Make a change to the home page component
+3. Save the file
+4. Watch your browser automatically update!
+
+<Tip>
+  All server components (files ending in `.server.jsx`) run on the server, while client components (`.client.jsx`) run in the browser. This is a key Hydrogen convention.
+</Tip>
+
+## Connect Your Own Data (Optional)
+
+Ready to connect your own Shopify store and Sanity project? Update the configuration files:
+
+<Steps>
+  <Step title="Update Shopify Configuration">
+    Edit `shopify.config.js` with your store credentials:
+    
+    ```javascript shopify.config.js
+    export default {
+      storeDomain: 'your-store.myshopify.com',
+      storefrontToken: 'your-storefront-access-token',
+      // ... other config
+    };
+    ```
+  </Step>
+
+  <Step title="Update Sanity Configuration">
+    Edit `sanity.config.js` with your project details:
+    
+    ```javascript sanity.config.js
+    export default {
+      apiVersion: 'v2021-06-07',
+      dataset: 'production',
+      projectId: 'your-project-id',
+      useCdn: true,
+    };
+    ```
+  </Step>
+
+  <Step title="Restart the Dev Server">
+    Stop the server (Ctrl+C) and restart it to load your new configuration:
+    
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+<Warning>
+  To use your own data, you'll need to set up [Sanity Connect for Shopify](https://www.sanity.io/docs/sanity-connect-for-shopify) to sync your products to Sanity, and install the [Sanity Shopify Studio](https://github.com/sanity-io/sanity-shopify-studio).
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Learn about prerequisites, dependencies, and detailed setup
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how the codebase is organized
+  </Card>
+  
+  <Card title="Data Fetching" icon="database" href="/concepts/data-fetching">
+    Learn how to query Sanity and Shopify together
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/deployment/overview">
+    Deploy your storefront to production
+  </Card>
+</CardGroup>
+
+## Need Help?
+
+<AccordionGroup>
+  <Accordion title="Server won't start">
+    Make sure you have Node.js 14.0 or higher installed:
+    ```bash
+    node --version
+    ```
+    
+    Try deleting `node_modules` and reinstalling:
+    ```bash
+    rm -rf node_modules
+    yarn install
+    ```
+  </Accordion>
+  
+  <Accordion title="Port 3000 is already in use">
+    You can specify a different port:
+    ```bash
+    PORT=3001 yarn dev
+    ```
+  </Accordion>
+  
+  <Accordion title="Changes aren't reflecting">
+    Vite's HMR is very fast, but sometimes a hard refresh helps:
+    - Press Ctrl+Shift+R (Windows/Linux) or Cmd+Shift+R (Mac)
+    - Or restart the dev server
+  </Accordion>
+</AccordionGroup>

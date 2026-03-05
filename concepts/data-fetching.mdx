@@ -1,0 +1,781 @@
+---
+title: Data Fetching with useSanityQuery
+description: Deep dive into the useSanityQuery hook and how it unifies Sanity and Shopify data fetching
+---
+
+# Data Fetching with useSanityQuery
+
+The `useSanityQuery` hook is the core data fetching primitive in Tune Me In, providing a unified interface for fetching content from Sanity CMS and product data from Shopify's Storefront API.
+
+## Overview
+
+`useSanityQuery` solves a common headless commerce challenge: combining content from a CMS with real-time product data from an e-commerce platform.
+
+### The Problem
+
+Without `useSanityQuery`, you'd need to:
+
+1. Query Sanity for content with product references
+2. Parse the response to find all product IDs
+3. Build a GraphQL query for Shopify Storefront API
+4. Fetch products from Shopify
+5. Normalize and combine both data sources
+6. Handle errors and missing products
+
+### The Solution
+
+```javascript
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+
+const {sanityData, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  params: {handle},
+});
+```
+
+One hook call returns:
+- **`sanityData`** - Your Sanity query results with all content
+- **`shopifyProducts`** - A normalized map of Shopify products, keyed by Sanity ID
+
+## Basic Usage
+
+### Simple Query
+
+From `pages/about.server.jsx:12-14`:
+
+```jsx
+const {sanityData: sanityPage} = useSanityQuery({
+  query: QUERY,
+});
+```
+
+If your query doesn't reference any Shopify products, `shopifyProducts` will be an empty object and no Shopify API calls are made.
+
+### Query with Parameters
+
+From `pages/[handle].server.jsx:16-23`:
+
+```jsx
+const {handle} = useParams();
+
+const {sanityData: sanityArticle} = useSanityQuery({
+  query: QUERY,
+  params: {
+    slug: handle,
+  },
+  // No need to query Shopify product data ✨
+  getProductGraphQLFragment: () => false,
+});
+```
+
+Parameters are passed to GROQ queries using `$variableName` syntax:
+
+```groq
+*[
+  _type == 'article.info'
+  && slug.current == $slug
+][0]
+```
+
+### Query with Products
+
+From `pages/products/[handle].server.jsx:24-50`:
+
+```jsx
+const {sanityData: sanityProduct, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  params: {
+    slug: handle,
+  },
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      mf:metafields(namespace:"tunemein", first:2){
+        edges {
+          node {
+            key
+            value
+          }
+        }
+      }
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+This fetches a product page with custom metafields and additional images.
+
+## Configuration Options
+
+### `query` (required)
+
+The GROQ query to execute against Sanity:
+
+```javascript
+const QUERY = groq`
+  *[_type == 'homepage'][0] {
+    title,
+    featuredProducts[] {
+      productWithVariant {
+        _id,
+        slug
+      }
+    }
+  }
+`;
+```
+
+<Note>
+Import `groq` from the `groq` package for syntax highlighting in supported editors.
+</Note>
+
+### `params` (optional)
+
+Parameters to pass to the GROQ query:
+
+```javascript
+{
+  params: {
+    slug: 'my-product',
+    limit: 10,
+    offset: 0
+  }
+}
+```
+
+Use in GROQ with `$` prefix:
+
+```groq
+*[_type == 'product' && slug.current == $slug][0]
+products[$offset...($offset + $limit)]
+```
+
+### `getProductGraphQLFragment` (optional)
+
+Customize which Shopify fields are fetched for each product:
+
+```javascript
+{
+  getProductGraphQLFragment: ({shopifyId, sanityId, occurrences}) => {
+    // Return true - use default ProductProviderFragment
+    // Return false - skip fetching this product
+    // Return string - use custom GraphQL fragment
+    
+    return `
+      id
+      title
+      handle
+      priceRange {
+        minVariantPrice {
+          amount
+          currencyCode
+        }
+      }
+    `;
+  }
+}
+```
+
+#### Callback Parameters
+
+- **`shopifyId`** - Numeric Shopify product ID
+- **`sanityId`** - Sanity document ID (e.g., `shopifyProduct-123`)
+- **`occurrences`** - Array of paths where this product appears in the response
+
+#### Return Values
+
+- **`true`** - Use Hydrogen's default `ProductProviderFragment` (includes all product data)
+- **`false`** - Don't fetch this product from Shopify
+- **`string`** - Custom GraphQL fragment for this product
+
+<Tip>
+Returning a custom fragment for all products can significantly reduce payload size when you only need specific fields.
+</Tip>
+
+## How It Works
+
+### Step-by-Step Process
+
+1. **Query Sanity** - Execute the GROQ query against Sanity's API
+2. **Parse Response** - Recursively scan the response for product references
+3. **Identify Products** - Find all `_id` or `_ref` fields matching `shopifyProduct-*`
+4. **Build GraphQL Query** - Construct a Shopify Storefront API query
+5. **Fetch Products** - Execute the GraphQL query via Hydrogen's `useShopQuery`
+6. **Normalize Response** - Convert the array response to an object map
+7. **Return Both** - Provide both Sanity data and Shopify products
+
+### Product Detection
+
+Products are identified by their Sanity document ID format:
+
+```
+shopifyProduct-{numericShopifyId}
+```
+
+For example:
+- `shopifyProduct-7349334187288`
+- `shopifyProduct-7342335787245`
+
+The hook scans for these IDs at any depth in the response:
+
+```javascript
+{
+  title: "Homepage",
+  sections: [
+    {
+      products: [
+        {
+          _id: "shopifyProduct-123",  // ← Detected!
+          title: "..."
+        }
+      ]
+    }
+  ],
+  hero: {
+    product: {
+      _ref: "shopifyProduct-456"  // ← Also detected!
+    }
+  }
+}
+```
+
+### GraphQL Query Construction
+
+The hook builds a query like this:
+
+```graphql
+query {
+  product1: product(id: "Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzEyMw==") {
+    ...ProductProviderFragment
+    # ... custom fields
+  }
+  product2: product(id: "Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzQ1Ng==") {
+    ...ProductProviderFragment
+    # ... custom fields
+  }
+}
+```
+
+Each product gets:
+- A unique query alias (`product1`, `product2`, etc.)
+- The base64-encoded Shopify Global ID
+- The appropriate GraphQL fragment
+
+<Info>
+Shopify Global IDs use the format `gid://shopify/Product/{id}` encoded as base64.
+</Info>
+
+### Response Normalization
+
+Shopify products are returned as an object map for easy lookup:
+
+```javascript
+{
+  'shopifyProduct-7349334187288': {
+    id: 'Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzczNDkzMzQxODcyODg=',
+    title: 'Red T-shirt',
+    handle: 'red-tshirt',
+    variants: { edges: [...] },
+    // ... all other fields
+  },
+  'shopifyProduct-7342335787245': {
+    // ... product data
+  }
+}
+```
+
+This allows direct access by Sanity ID:
+
+```javascript
+const shopifyData = shopifyProducts[sanityProduct._id];
+```
+
+## Common Patterns
+
+### Pattern 1: Homepage with Featured Products
+
+From `pages/Index.server.jsx:25-48`:
+
+```jsx
+const {sanityData: sanityPage, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      mf:metafields(namespace:"tunemein", first:1){
+        edges {
+          node {
+            key
+            value
+          }
+        }
+      }
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+Then merge the data:
+
+```jsx
+<FeaturedCollection
+  title={featuredCollection1.title}
+  products={featuredCollection1.products.map((product) => {
+    return {
+      ...product.productData,
+      storefront: shopifyProducts?.[product?.productData._id],
+    };
+  })}
+/>
+```
+
+### Pattern 2: Product Detail Page
+
+From `pages/products/[handle].server.jsx:54-63`:
+
+```jsx
+const storefrontProduct = shopifyProducts?.[sanityProduct?._id];
+
+if (!sanityProduct || !storefrontProduct) {
+  return <NotFound />;
+}
+
+const product = {
+  ...sanityProduct,
+  storefront: storefrontProduct,
+};
+```
+
+This creates a unified product object with:
+- Sanity fields (custom content, references, metadata)
+- Shopify fields (pricing, variants, availability)
+
+### Pattern 3: Content-Only Pages
+
+From `pages/[handle].server.jsx:16-23`:
+
+```jsx
+const {sanityData: sanityArticle} = useSanityQuery({
+  query: QUERY,
+  params: {
+    slug: handle,
+  },
+  // No need to query Shopify product data ✨
+  getProductGraphQLFragment: () => false,
+});
+```
+
+Returning `false` from `getProductGraphQLFragment` skips all Shopify queries, even if product references are found.
+
+### Pattern 4: Paginated Collections
+
+From `pages/collections/[handle].server.jsx:16-43`:
+
+```jsx
+const pageSize = 6;
+const page = currentPage || 0;
+const start = page * pageSize;
+const end = start + (pageSize - 1);
+
+const {sanityData: sanityCollection, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  params: {
+    slug: handle,
+    start,
+    end,
+  },
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+The GROQ query uses array slicing:
+
+```groq
+products[available][$start..$end]
+```
+
+### Pattern 5: Product Context for Nested Components
+
+From `pages/products/[handle].server.jsx:84-91`:
+
+```jsx
+<ProductsProvider value={shopifyProducts}>
+  <Layout>
+    <ProductProvider
+      product={product?.storefront}
+      initialVariantId={productVariant?.node?.id}
+    >
+      <ProductDetails product={product} />
+    </ProductProvider>
+  </Layout>
+</ProductsProvider>
+```
+
+Nested components can access products via context:
+
+```jsx
+import {useProductsContext} from '../contexts/ProductsContext.client';
+
+function ProductCard({productId}) {
+  const product = useProductsContext(productId);
+  return <div>{product.title}</div>;
+}
+```
+
+## Advanced Techniques
+
+### Conditional Fragment Selection
+
+You can return different fragments based on context:
+
+```javascript
+getProductGraphQLFragment: ({shopifyId, sanityId, occurrences}) => {
+  // Full data for featured products
+  if (occurrences.some(path => path.includes('featured'))) {
+    return `
+      ...ProductProviderFragment
+      metafields(first: 5) { ... }
+    `;
+  }
+  
+  // Minimal data for other products
+  return `
+    id
+    title
+    handle
+    priceRange { minVariantPrice { amount currencyCode } }
+  `;
+}
+```
+
+### Performance Optimization
+
+For pages with many products, fetch minimal data:
+
+```javascript
+getProductGraphQLFragment: () => {
+  return `
+    id
+    title
+    handle
+    priceRange {
+      minVariantPrice {
+        amount
+        currencyCode
+      }
+    }
+    variants(first: 1) {
+      edges {
+        node {
+          id
+          availableForSale
+        }
+      }
+    }
+  `;
+}
+```
+
+This reduces the payload significantly when showing product grids.
+
+### Handling Missing Products
+
+Always check for product existence:
+
+```jsx
+const products = sanityCollection.products.map(sanityProduct => {
+  const shopifyData = shopifyProducts?.[sanityProduct._id];
+  
+  // Skip products that don't exist in Shopify
+  if (!shopifyData) return null;
+  
+  return {
+    ...sanityProduct,
+    storefront: shopifyData
+  };
+}).filter(Boolean);
+```
+
+### Extending with useShopQuery
+
+For additional Shopify data not in Sanity:
+
+```jsx
+import {useShopQuery} from '@shopify/hydrogen';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+
+const {sanityData, shopifyProducts} = useSanityQuery({query: SANITY_QUERY});
+
+const {data: shopCollection} = useShopQuery({
+  query: SHOPIFY_COLLECTION_QUERY,
+  variables: {handle: 'sale'},
+});
+
+// Combine both data sources
+const pageData = {
+  ...sanityData,
+  saleCollection: shopCollection,
+  products: shopifyProducts
+};
+```
+
+## GraphQL Fragment Reference
+
+### Default: ProductProviderFragment
+
+Includes all fields needed by Hydrogen's `<ProductProvider>`:
+
+- Product ID, title, handle, description
+- Media (images, videos)
+- All variants with pricing
+- Price ranges
+- Selling plan groups
+
+### Minimal Fragment
+
+For product cards in listings:
+
+```graphql
+id
+title
+handle
+priceRange {
+  minVariantPrice {
+    amount
+    currencyCode
+  }
+}
+media(first: 1) {
+  edges {
+    node {
+      ... on MediaImage {
+        image {
+          url
+          altText
+        }
+      }
+    }
+  }
+}
+```
+
+### Extended Fragment
+
+For product detail pages with custom data:
+
+```graphql
+...ProductProviderFragment
+metafields(namespace: "custom", first: 10) {
+  edges {
+    node {
+      key
+      value
+      type
+    }
+  }
+}
+images(first: 20) {
+  edges {
+    node {
+      url
+      altText
+      width
+      height
+    }
+  }
+}
+tags
+productType
+vendor
+```
+
+## Error Handling
+
+### Missing Products
+
+Products referenced in Sanity may not exist in Shopify (deleted, archived):
+
+```jsx
+const {sanityData, shopifyProducts} = useSanityQuery({query: QUERY});
+
+// Filter out missing products
+const availableProducts = sanityData.products
+  .filter(p => shopifyProducts[p._id])
+  .map(p => ({
+    ...p,
+    storefront: shopifyProducts[p._id]
+  }));
+```
+
+### API Failures
+
+```jsx
+try {
+  const {sanityData, shopifyProducts} = useSanityQuery({query: QUERY});
+  // ... render with data
+} catch (error) {
+  console.error('Failed to fetch data:', error);
+  return <ErrorPage />;
+}
+```
+
+### Null Checks
+
+Always use optional chaining:
+
+```jsx
+const price = product.storefront?.variants?.edges[0]?.node?.priceV2?.amount;
+const metafields = product.storefront?.mf?.edges || [];
+```
+
+## Best Practices
+
+### 1. Destructure with Aliases
+
+```javascript
+const {sanityData: sanityPage, shopifyProducts} = useSanityQuery(...);
+```
+
+Renaming `sanityData` makes your code more readable.
+
+### 2. Use Fragment Composition
+
+```javascript
+import {PRODUCT_WITH_VARIANT} from '../fragments/productWithVariant';
+import {IMAGE} from '../fragments/image';
+
+const QUERY = groq`
+  *[_id == 'home'][0] {
+    products[] {
+      ${PRODUCT_WITH_VARIANT}
+    },
+    hero {
+      ${IMAGE}
+    }
+  }
+`;
+```
+
+### 3. Optimize Fragment Selection
+
+- **Product grids** - Minimal fragment (title, price, first image)
+- **Product cards** - Standard fragment with first 3 variants
+- **Product pages** - Full fragment with all variants and metafields
+
+### 4. Handle Product Availability
+
+Always check Sanity's availability flag:
+
+```groq
+product->{
+  _id,
+  "available": !store.isDeleted && store.status == 'active'
+}
+```
+
+Filter in your component:
+
+```jsx
+const products = sanityData.products.filter(p => p.available);
+```
+
+### 5. Paginate Large Collections
+
+Don't fetch all products at once:
+
+```groq
+products[available][$start..$end]
+```
+
+### 6. Provide Fallbacks
+
+```jsx
+const product = {
+  ...sanityProduct,
+  storefront: shopifyProducts?.[sanityProduct._id] || {
+    title: sanityProduct.store?.title,
+    available: false
+  }
+};
+```
+
+## Comparison with Alternatives
+
+### Without useSanityQuery
+
+```jsx
+// Fetch from Sanity
+const sanityResponse = await sanityClient.fetch(QUERY);
+
+// Manually find product IDs
+const productIds = findProductIds(sanityResponse);
+
+// Build Shopify query
+const shopifyQuery = buildProductQuery(productIds);
+
+// Fetch from Shopify
+const shopifyResponse = await fetch(SHOPIFY_API, {
+  body: JSON.stringify({query: shopifyQuery})
+});
+
+// Normalize response
+const products = normalizeProducts(shopifyResponse);
+
+// Combine data
+const result = mergeData(sanityResponse, products);
+```
+
+### With useSanityQuery
+
+```jsx
+const {sanityData, shopifyProducts} = useSanityQuery({
+  query: QUERY
+});
+```
+
+All the complexity is handled automatically.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand how useSanityQuery fits into the overall architecture
+  </Card>
+  <Card title="Sanity Integration" icon="palette" href="/concepts/sanity-integration">
+    Learn about GROQ queries and Sanity document types
+  </Card>
+  <Card title="Shopify Integration" icon="cart-shopping" href="/concepts/shopify-integration">
+    Deep dive into Shopify Storefront API and GraphQL
+  </Card>
+  <Card title="Component Guide" icon="puzzle-piece" href="/guides/components">
+    See real-world examples of useSanityQuery in components
+  </Card>
+</CardGroup>

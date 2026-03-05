@@ -1,0 +1,209 @@
+---
+title: 'Components'
+description: 'Guide to using and creating components in Tune Me In'
+---
+
+# Components
+
+Tune Me In uses Shopify Hydrogen's component architecture, which distinguishes between server and client components for optimal performance.
+
+## Server vs Client Components
+
+Hydrogen uses file naming conventions to determine where components run:
+
+- **`.server.jsx`** - Components that run only on the server (can fetch data, access secrets)
+- **`.client.jsx`** - Components that run on the client (can use React hooks, state, interactivity)
+
+### Server Components
+
+Server components render on the server and have access to server-side data. They cannot use client-side features like `useState` or `useEffect`.
+
+```jsx src/components/Layout.server.jsx
+import {LocalizationProvider} from '@shopify/hydrogen';
+import HeaderScroll from './simplistic/HeaderScroll.client';
+import Footer from './Footer.server';
+import Cart from './Cart.client';
+
+export default function Layout({children}) {
+  return (
+    <LocalizationProvider>
+      <HeaderScroll />
+      <div className="min-h-screen max-w-screen text-gray-700">
+        <Cart />
+        <main id="mainContent">{children}</main>
+        <Footer />
+      </div>
+    </LocalizationProvider>
+  );
+}
+```
+
+### Client Components
+
+Client components run in the browser and can use React hooks and handle interactivity.
+
+```jsx src/components/Button.client.jsx
+export default function Button(props) {
+  const {children} = props;
+  return (
+    <div className="block w-full text-white text-sm bg-black px-3 py-4 disabled:cursor-wait disabled:opacity-60">
+      {children}
+    </div>
+  );
+}
+```
+
+## Component Structure
+
+Tune Me In organizes components into several directories:
+
+```
+src/components/
+├── annotations/       # Portable Text annotation components
+├── blocks/           # Portable Text block components
+├── icons/            # SVG icon components
+├── simplistic/       # Theme-specific components
+├── Button.client.jsx
+├── Cart.client.jsx
+├── Header.server.jsx
+├── Layout.server.jsx
+└── ...
+```
+
+## Creating a New Component
+
+<Steps>
+  <Step title="Choose the component type">
+    Determine if your component needs client-side interactivity or can be server-rendered.
+    
+    Use `.client.jsx` if you need:
+    - React hooks (`useState`, `useEffect`, etc.)
+    - Browser APIs
+    - Event handlers
+    
+    Use `.server.jsx` if:
+    - No interactivity needed
+    - Fetching data from Sanity or Shopify
+    - Better performance is desired
+  </Step>
+  
+  <Step title="Create the component file">
+    Create a new file in `src/components/` with the appropriate extension:
+    
+    ```jsx src/components/ProductBadge.client.jsx
+    export default function ProductBadge({text, variant = 'default'}) {
+      const styles = {
+        default: 'bg-gray-200 text-gray-800',
+        sale: 'bg-red-500 text-white',
+        new: 'bg-blue-500 text-white',
+      };
+      
+      return (
+        <span className={`px-2 py-1 text-xs font-medium rounded ${styles[variant]}`}>
+          {text}
+        </span>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Import and use the component">
+    Import your component in a page or another component:
+    
+    ```jsx
+    import ProductBadge from '../components/ProductBadge.client';
+    
+    export default function ProductCard({product}) {
+      return (
+        <div>
+          <ProductBadge text="New" variant="new" />
+          {/* ... */}
+        </div>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Using Hydrogen Components
+
+Hydrogen provides built-in components for common e-commerce patterns:
+
+### Product Components
+
+```jsx
+import {Product} from '@shopify/hydrogen/client';
+
+export default function ProductCard({product}) {
+  return (
+    <Product product={product.storefront}>
+      <div className="bg-white">
+        <Product.SelectedVariant.Image
+          className="w-full object-cover"
+          options={{width: 800}}
+        />
+        <Product.Title />
+        <Product.SelectedVariant.Price className="text-gray-900" />
+      </div>
+    </Product>
+  );
+}
+```
+
+### Add to Cart
+
+```jsx src/components/ButtonSelectedVariantAddToCart.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import Button from './Button.client';
+
+export default function ButtonSelectedVariantAddToCart() {
+  return (
+    <Product.SelectedVariant.AddToCartButton>
+      <Button>Add to Cart</Button>
+    </Product.SelectedVariant.AddToCartButton>
+  );
+}
+```
+
+## Component Best Practices
+
+<AccordionGroup>
+  <Accordion title="Minimize client components">
+    Use server components by default for better performance. Only use client components when you need interactivity or browser APIs.
+  </Accordion>
+  
+  <Accordion title="Keep components focused">
+    Each component should have a single responsibility. Break down complex components into smaller, reusable pieces.
+  </Accordion>
+  
+  <Accordion title="Use TypeScript for type safety">
+    While this starter uses JSX, consider migrating to TSX for better type safety:
+    
+    ```tsx
+    interface ButtonProps {
+      children: React.ReactNode;
+      variant?: 'primary' | 'secondary';
+      onClick?: () => void;
+    }
+    
+    export default function Button({children, variant = 'primary', onClick}: ButtonProps) {
+      // ...
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Co-locate related components">
+    Group related components together in subdirectories (like `annotations/`, `blocks/`) for better organization.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pages" icon="file" href="/guides/pages">
+    Learn how to create and structure pages in Hydrogen
+  </Card>
+  <Card title="Styling" icon="palette" href="/guides/styling">
+    Style your components with Tailwind CSS
+  </Card>
+</CardGroup>

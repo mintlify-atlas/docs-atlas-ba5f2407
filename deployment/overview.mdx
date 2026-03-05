@@ -1,0 +1,165 @@
+---
+title: Deployment Overview
+description: Learn how to deploy your Tune Me In Hydrogen storefront to production
+---
+
+# Deployment Overview
+
+Tune Me In is built on Shopify Hydrogen, a React-based framework for building custom Shopify storefronts. This guide covers deployment options and the build process for getting your storefront into production.
+
+## Hosting Options
+
+Hydrogen apps can be deployed to various hosting platforms. Tune Me In includes configurations for:
+
+### Fly.io (Recommended)
+
+The project includes a `fly.toml` configuration file for deploying to Fly.io, which provides:
+
+- Global edge deployment
+- Automatic SSL certificates
+- Built-in load balancing
+- Easy scaling options
+
+The included configuration sets up:
+- **Port**: 8080 (internal)
+- **External ports**: 80 (HTTP) and 443 (HTTPS)
+- **Concurrency limits**: 20 soft / 25 hard connections
+
+### Cloudflare Workers
+
+The project includes a `worker.js` file for deploying to Cloudflare Workers:
+
+- Serverless edge computing
+- Global CDN distribution
+- Excellent performance for static assets
+- Built-in caching with `caches.default`
+
+### Node.js Server
+
+For traditional hosting environments, Tune Me In includes an Express-based Node.js server (`server.js`) that can run on:
+
+- DigitalOcean
+- AWS EC2
+- Google Cloud Compute
+- Any VPS or container platform
+
+### Edgio (Layer0)
+
+The project includes Edgio (formerly Layer0) deployment scripts:
+
+```bash
+yarn layer0:dev      # Development mode
+yarn layer0:build    # Build for Edgio
+yarn layer0:deploy   # Deploy to Edgio
+```
+
+## Build Process
+
+Tune Me In uses Vite as its build tool. The build process creates three separate bundles:
+
+<Steps>
+
+### Build the client bundle
+
+Generates the browser-side JavaScript and assets:
+
+```bash
+yarn build:client
+```
+
+Output: `dist/client/` directory with static assets and `index.html`
+
+### Build the server bundle
+
+Creates the server-side rendering entry point:
+
+```bash
+yarn build:server
+```
+
+Output: `dist/server/entry-server.js`
+
+### Build the worker bundle
+
+Generates the Cloudflare Worker or edge runtime bundle:
+
+```bash
+yarn build:worker
+```
+
+Output: `dist/worker/worker.js`
+
+### Run full build
+
+Build all three bundles in sequence:
+
+```bash
+yarn build
+```
+
+</Steps>
+
+## Deployment with Docker
+
+The project includes a `Dockerfile` for containerized deployments:
+
+```dockerfile
+FROM node:14 AS build-env
+ADD . /app
+WORKDIR /app
+RUN npm install
+RUN npm run build
+
+FROM gcr.io/distroless/nodejs:14 AS run-env
+ENV NODE_ENV production
+COPY --from=build-env /app /app
+EXPOSE 8080
+WORKDIR /app
+CMD ["server.js"]
+```
+
+This multi-stage build:
+1. Installs dependencies and builds the app in a Node.js environment
+2. Copies the built application to a minimal distroless image
+3. Exposes port 8080 for the Express server
+
+<Warning>
+The Dockerfile uses Node.js 14, which is approaching end-of-life. Consider upgrading to Node.js 18 LTS or later for security and performance improvements.
+</Warning>
+
+## Production Server
+
+The production server (`server.js`) includes:
+
+- **Compression**: Automatic response compression for faster delivery
+- **Static file serving**: Efficient serving of built client assets
+- **Hydrogen middleware**: Server-side rendering with Hydrogen
+- **Configurable port**: Defaults to 8080, configurable via `PORT` environment variable
+
+<Warning>
+Caching is currently disabled in production mode (`nocache` middleware). This is a temporary measure - you should implement proper caching strategies before deploying to production.
+</Warning>
+
+## Development vs Production
+
+Key differences between development and production modes:
+
+| Feature | Development | Production |
+|---------|-------------|------------|
+| **Server** | Vite dev server | Express + Hydrogen middleware |
+| **Hot reload** | ✓ Enabled | ✗ Disabled |
+| **Caching** | ✗ Disabled | ✗ Currently disabled |
+| **Compression** | ✗ Disabled | ✓ Enabled |
+| **Source maps** | ✓ Inline | ✓ Enabled with `--enable-source-maps` |
+| **Build output** | In-memory | `dist/` directory |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Configuration" icon="gear" href="/deployment/configuration">
+    Configure environment variables and credentials for production
+  </Card>
+  <Card title="Hydrogen Deployment Docs" icon="book" href="https://shopify.dev/custom-storefronts/hydrogen/deployment">
+    Official Shopify Hydrogen deployment documentation
+  </Card>
+</CardGroup>

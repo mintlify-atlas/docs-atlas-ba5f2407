@@ -1,0 +1,360 @@
+---
+title: 'useProductsContext'
+description: 'Hook for accessing Shopify products fetched by useSanityQuery in deeply nested components'
+icon: 'function'
+---
+
+## Overview
+
+The `useProductsContext` hook provides easy access to Shopify product data throughout your component tree. It's designed to work with products fetched by [`useSanityQuery`](/api/use-sanity-query) and made available through `ProductsProvider`.
+
+This is particularly useful for accessing products in deeply nested components like Portable Text blocks and annotations without prop drilling.
+
+## Import
+
+```javascript
+import {useProductsContext} from '../contexts/ProductsContext.client';
+```
+
+## Basic Usage
+
+```javascript
+const BlockInlineProduct = ({node}) => {
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return '(Product not found)';
+  }
+
+  return (
+    <div>
+      <h3>{storefrontProduct.title}</h3>
+      <p>${storefrontProduct.priceRange.minVariantPrice.amount}</p>
+    </div>
+  );
+};
+```
+
+## Parameters
+
+<ParamField path="productId" type="string" required>
+  The Sanity product ID to retrieve from the context. This should match the `_id` format from your Sanity dataset (e.g., `"shopifyProduct-7349334187288"`).
+</ParamField>
+
+## Return Value
+
+Returns the Shopify product object for the specified ID, or `undefined` if the product is not found in the context.
+
+<ResponseField name="product" type="object | undefined">
+  The complete Shopify product data from the Storefront API, including:
+  
+  ```javascript
+  {
+    id: 'Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzY2Mzk2Mjk5MjY0ODc=',
+    title: 'Red T-shirt',
+    handle: 'red-tshirt',
+    descriptionHtml: '<p>Product description</p>',
+    priceRange: {
+      minVariantPrice: { amount: '29.99', currencyCode: 'USD' },
+      maxVariantPrice: { amount: '29.99', currencyCode: 'USD' }
+    },
+    compareAtPriceRange: { ... },
+    variants: { edges: [...] },
+    media: { edges: [...] },
+    metafields: { edges: [...] }
+  }
+  ```
+</ResponseField>
+
+## Setup
+
+### 1. Fetch Products with useSanityQuery
+
+First, fetch Shopify products in your server component:
+
+```javascript src/pages/editorial/[handle].server.jsx
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import ProductsProvider from '../../contexts/ProductsProvider.client';
+
+export default function EditorialArticle() {
+  const {sanityData: sanityArticle, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+    params: {slug: handle},
+  });
+
+  return (
+    <ProductsProvider value={shopifyProducts}>
+      <article>
+        <h1>{sanityArticle.title}</h1>
+        <PortableText blocks={sanityArticle.body} />
+      </article>
+    </ProductsProvider>
+  );
+}
+```
+
+### 2. Access Products in Nested Components
+
+Use the hook in any component within the provider:
+
+```javascript src/components/blocks/BlockInlineProduct.client.jsx
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+
+const BlockInlineProduct = ({node}) => {
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return null;
+  }
+
+  return (
+    <Product product={storefrontProduct}>
+      <Product.Title />
+      <Product.Price />
+    </Product>
+  );
+};
+```
+
+## Usage Examples
+
+### Inline Product in Portable Text
+
+```javascript src/components/blocks/BlockInlineProduct.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+import LinkProduct from '../LinkProduct.client';
+
+const BlockInlineProduct = ({node}) => {
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return '(Product not found)';
+  }
+
+  return (
+    <Product
+      product={storefrontProduct}
+      initialVariantId={product?.variantId}
+    >
+      <LinkProduct
+        handle={storefrontProduct.handle}
+        variantId={product?.variantId}
+      >
+        <Product.Title className="font-medium text-blue-500" />
+      </LinkProduct>
+    </Product>
+  );
+};
+
+export default BlockInlineProduct;
+```
+
+### Product Annotation with Tooltip
+
+```javascript src/components/annotations/AnnotationProduct.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import Tippy from '@tippyjs/react/headless';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+
+const AnnotationProduct = ({children, mark}) => {
+  const product = mark?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  // Return text only if no valid product is found
+  if (!storefrontProduct) {
+    return children;
+  }
+
+  return (
+    <Tippy
+      interactive
+      placement="top"
+      render={(attrs) => (
+        <Product product={storefrontProduct}>
+          <div className="bg-white border border-black p-2" {...attrs}>
+            <Product.Title className="font-medium" />
+            <Product.Price />
+            <Product.SelectedVariant.Image className="my-2 w-full" />
+          </div>
+        </Product>
+      )}
+    >
+      <span className="text-blue-500 cursor-pointer">
+        {children}
+      </span>
+    </Tippy>
+  );
+};
+
+export default AnnotationProduct;
+```
+
+### Margin Product Display
+
+```javascript src/components/blocks/BlockInlineProductMarginalia.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+import ButtonSelectedVariantAddToCart from '../ButtonSelectedVariantAddToCart.client';
+
+const BlockInlineProductMarginalia = ({node}) => {
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  // Return nothing if no valid product is found
+  if (!storefrontProduct) {
+    return null;
+  }
+
+  return (
+    <Product
+      product={storefrontProduct}
+      initialVariantId={product?.variantId}
+    >
+      <div className="border p-4">
+        <Product.SelectedVariant.Image
+          options={{
+            width: 300,
+            height: 250,
+            crop: 'center',
+          }}
+        />
+        <Product.Title className="text-lg font-medium mt-2" />
+        <Product.Price className="text-gray-600" />
+        <ButtonSelectedVariantAddToCart />
+      </div>
+    </Product>
+  );
+};
+
+export default BlockInlineProductMarginalia;
+```
+
+## Error Handling
+
+The hook throws an error if used outside of a `ProductsProvider`:
+
+```javascript
+export const useProductsContext = (productId) => {
+  const context = useContext(ProductsContext);
+
+  if (!context) {
+    throw new Error('No products context found');
+  }
+
+  return context?.[productId];
+};
+```
+
+**Best practice**: Always check if the returned product exists before using it:
+
+```javascript
+const storefrontProduct = useProductsContext(product?._id);
+
+if (!storefrontProduct) {
+  return null; // or a fallback UI
+}
+
+// Safe to use storefrontProduct here
+```
+
+## ProductsProvider
+
+The `ProductsProvider` component wraps your content and provides product data to the context.
+
+### Props
+
+<ParamField path="value" type="object">
+  The `shopifyProducts` object returned by `useSanityQuery`. This should be a normalized object with product IDs as keys.
+  
+  ```javascript
+  {
+    'shopifyProduct-123': { /* product data */ },
+    'shopifyProduct-456': { /* product data */ }
+  }
+  ```
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  The components that need access to product data.
+</ParamField>
+
+### Example
+
+```javascript
+import ProductsProvider from '../../contexts/ProductsProvider.client';
+
+<ProductsProvider value={shopifyProducts}>
+  <YourContent />
+</ProductsProvider>
+```
+
+## Type Safety
+
+The context is defined using React's `createContext`:
+
+```javascript src/contexts/ProductsContext.client.jsx
+import {createContext, useContext} from 'react';
+
+const ProductsContext = createContext();
+
+export default ProductsContext;
+
+export const useProductsContext = (productId) => {
+  const context = useContext(ProductsContext);
+
+  if (!context) {
+    throw new Error('No products context found');
+  }
+
+  return context?.[productId];
+};
+```
+
+## Common Patterns
+
+### Pattern 1: Optional Product Reference
+
+```javascript
+const storefrontProduct = useProductsContext(product?._id);
+
+if (!storefrontProduct) {
+  return <div>Product unavailable</div>;
+}
+
+return <ProductDisplay product={storefrontProduct} />;
+```
+
+### Pattern 2: Multiple Products
+
+```javascript
+const products = productIds.map(id => useProductsContext(id)).filter(Boolean);
+
+return (
+  <div>
+    {products.map(product => (
+      <ProductCard key={product.id} product={product} />
+    ))}
+  </div>
+);
+```
+
+### Pattern 3: Conditional Rendering
+
+```javascript
+const storefrontProduct = useProductsContext(product?._id);
+
+return storefrontProduct ? (
+  <ProductWithActions product={storefrontProduct} />
+) : (
+  <span>{children}</span>
+);
+```
+
+## Related
+
+- [useSanityQuery](/api/use-sanity-query) - Fetch Sanity data and Shopify products
+- [Custom Hooks](/api/custom-hooks) - Other utility hooks in the project

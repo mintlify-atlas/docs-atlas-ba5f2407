@@ -1,0 +1,249 @@
+---
+title: Architecture Overview
+description: Understanding the Tune Me In architecture and how Hydrogen, Sanity, and Shopify work together
+---
+
+# Architecture Overview
+
+Tune Me In is built on a modern headless commerce architecture that combines three powerful platforms:
+
+- **Shopify Storefront API** - Product catalog, inventory, and checkout
+- **Sanity CMS** - Content management and editorial features
+- **Hydrogen** - React-based framework for building custom storefronts
+
+## High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Hydrogen Storefront                       │
+│                     (React/Vite)                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │  useSanityQuery  │◄────────┤ Server Components│         │
+│  │                  │         │                  │         │
+│  └────────┬─────────┘         └──────────────────┘         │
+│           │                                                 │
+│           │                                                 │
+│  ┌────────▼──────────┐       ┌────────────────────┐        │
+│  │  Sanity Client    │       │ Shopify Storefront │        │
+│  │  (GROQ/GraphQL)   │       │    GraphQL API     │        │
+│  └────────┬──────────┘       └─────────┬──────────┘        │
+│           │                            │                   │
+└───────────┼────────────────────────────┼───────────────────┘
+            │                            │
+            ▼                            ▼
+    ┌───────────────┐          ┌──────────────────┐
+    │  Sanity CMS   │          │ Shopify Platform │
+    │               │          │                  │
+    │ - Content     │          │ - Products       │
+    │ - Editorial   │◄─────────┤ - Variants       │
+    │ - References  │  Sync    │ - Inventory      │
+    └───────────────┘          └──────────────────┘
+         (via Sanity Connect for Shopify)
+```
+
+## Core Components
+
+### 1. Hydrogen Framework
+
+Hydrogen is Shopify's React-based framework for building custom storefronts. It provides:
+
+- **Server Components** - React Server Components for optimal performance
+- **Streaming SSR** - Fast initial page loads with progressive enhancement
+- **Built-in Components** - Pre-built components for common e-commerce patterns
+- **Developer Experience** - Hot module replacement and fast refresh with Vite
+
+<Info>
+Tune Me In uses Hydrogen v0.7.0, which is based on React 18 alpha with experimental Server Components support.
+</Info>
+
+### 2. Sanity CMS Integration
+
+Sanity provides the content layer, storing:
+
+- **Product References** - References to Shopify products with custom metadata
+- **Editorial Content** - Rich content using Portable Text
+- **Page Structures** - Homepage, collections, articles, and custom pages
+- **Media Assets** - Images with transformations and optimization
+
+**Configuration** (`sanity.config.js:1-7`):
+
+```javascript
+export default {
+  apiVersion: 'v2021-06-07',
+  dataset: 'production',
+  projectId: 'wfr1r0dw',
+  useCdn: true,
+};
+```
+
+### 3. Shopify Storefront API
+
+The Shopify Storefront API provides real-time commerce data:
+
+- **Product Data** - Titles, descriptions, pricing, availability
+- **Variants** - Product options, SKUs, inventory levels
+- **Media** - Product images and videos
+- **Metafields** - Custom product metadata (e.g., `tunemein` namespace)
+
+**Configuration** (`shopify.config.js:3-9`):
+
+```javascript
+export default {
+  graphqlApiVersion: 'unstable',
+  locale: 'en-us',
+  storeDomain: 'sanity-dev-store.myshopify.com',
+  storefrontToken: '791dbd01268e4a7129288e24b1012710',
+  sanity: sanityConfig,
+};
+```
+
+## Application Structure
+
+### Entry Point
+
+The application starts in `App.server.jsx:11-24`, which sets up the core providers:
+
+```jsx
+export default function App({...serverState}) {
+  const pages = import.meta.globEager('./pages/**/*.server.(jsx|tsx)');
+  return (
+    <Suspense>
+      <ShopifyServerProvider shopifyConfig={shopifyConfig} {...serverState}>
+        <CartProvider>
+          <ResponsiveProvider>
+            <Main pages={pages} serverState={serverState} />
+          </ResponsiveProvider>
+        </CartProvider>
+      </ShopifyServerProvider>
+    </Suspense>
+  );
+}
+```
+
+<Note>
+The `ShopifyServerProvider` wraps the entire application, making Shopify configuration available throughout the component tree.
+</Note>
+
+### Page Structure
+
+Pages follow the file-based routing convention:
+
+- `pages/Index.server.jsx` - Homepage
+- `pages/[handle].server.jsx` - Dynamic article pages
+- `pages/products/[handle].server.jsx` - Product detail pages
+- `pages/collections/[handle].server.jsx` - Collection listing pages
+
+All server components use the `.server.jsx` extension, while client components use `.client.jsx`.
+
+## Data Flow
+
+### Unified Data Fetching
+
+1. **Server Component** renders and calls `useSanityQuery`
+2. **Sanity Query** fetches content with product references
+3. **Product Detection** identifies Shopify product IDs in the response
+4. **Storefront Query** automatically fetches product data from Shopify
+5. **Merged Response** returns both Sanity content and Shopify products
+
+### Example Flow
+
+From `pages/Index.server.jsx:25-48`:
+
+```jsx
+const {sanityData: sanityPage, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      mf:metafields(namespace:"tunemein", first:1){
+        edges {
+          node {
+            key
+            value
+          }
+        }
+      }
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+- `sanityData` contains the full Sanity response with product references
+- `shopifyProducts` contains a normalized map of products keyed by Sanity ID
+
+<Tip>
+The `getProductGraphQLFragment` callback allows you to customize which Shopify fields are fetched, optimizing performance for different use cases.
+</Tip>
+
+## Key Design Patterns
+
+### Server vs Client Components
+
+- **Server Components** (`.server.jsx`) - Data fetching, layout, non-interactive elements
+- **Client Components** (`.client.jsx`) - Interactive UI, state management, browser APIs
+
+### Product Context Pattern
+
+Products fetched via `useSanityQuery` are passed through React Context (`ProductsProvider.client.jsx:3-11`) to deeply nested components:
+
+```jsx
+const ProductsProvider = ({children, value = {}}) => {
+  return (
+    <ProductsContext.Provider value={value}>
+      {children}
+    </ProductsContext.Provider>
+  );
+};
+```
+
+Components can then access products using `useProductsContext(productId)` without prop drilling.
+
+### Fragment Composition
+
+GROQ queries use reusable fragments (`src/fragments/`) to maintain consistency:
+
+- `IMAGE` - Standard image fields with transformations
+- `PRODUCT_WITH_VARIANT` - Product references with variant selection
+- `PORTABLE_TEXT` - Rich content with nested product references
+- `SEO` - Metadata for search optimization
+
+## Performance Considerations
+
+### Caching Strategy
+
+- **Sanity CDN** - Content is served from a global CDN when `useCdn: true`
+- **Shopify Storefront** - Product data is always fresh from Shopify's API
+- **Hydrogen Caching** - Currently disabled in the demo (see README caveats)
+
+### Image Optimization
+
+- Sanity images include low-quality image placeholders (LQIP) for progressive loading
+- Images are transformed on-demand via Sanity's image CDN
+- Shopify product images are served from Shopify's CDN
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sanity Integration" icon="palette" href="/concepts/sanity-integration">
+    Learn how Sanity CMS powers the content layer
+  </Card>
+  <Card title="Shopify Integration" icon="cart-shopping" href="/concepts/shopify-integration">
+    Understand how Shopify provides commerce functionality
+  </Card>
+  <Card title="Data Fetching" icon="database" href="/concepts/data-fetching">
+    Deep dive into the useSanityQuery hook
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/installation">
+    Set up your own Tune Me In storefront
+  </Card>
+</CardGroup>

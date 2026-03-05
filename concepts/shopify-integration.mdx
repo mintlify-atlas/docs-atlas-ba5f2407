@@ -1,0 +1,548 @@
+---
+title: Shopify Integration
+description: How Shopify Storefront API powers commerce functionality in Tune Me In
+---
+
+# Shopify Integration
+
+Shopify provides the commerce engine for Tune Me In through its Storefront API, delivering real-time product data, inventory, and checkout functionality.
+
+## Overview
+
+The Shopify integration provides:
+
+- **Product Data** - Real-time pricing, availability, and variants
+- **Inventory Management** - Live stock levels and availability
+- **Product Media** - Images, videos, and 3D models
+- **Metafields** - Custom product metadata
+- **Cart & Checkout** - Shopping cart and secure checkout flow
+
+## Configuration
+
+Shopify is configured in `shopify.config.js:3-9`:
+
+```javascript
+export default {
+  graphqlApiVersion: 'unstable',
+  locale: 'en-us',
+  storeDomain: 'sanity-dev-store.myshopify.com',
+  storefrontToken: '791dbd01268e4a7129288e24b1012710',
+  sanity: sanityConfig,
+};
+```
+
+### Configuration Options
+
+- **`graphqlApiVersion`** - Storefront API version (`'unstable'` uses the latest features)
+- **`locale`** - Default locale for the storefront
+- **`storeDomain`** - Your Shopify store domain (`.myshopify.com`)
+- **`storefrontToken`** - Public access token for the Storefront API
+- **`sanity`** - Embedded Sanity configuration for unified setup
+
+<Warning>
+Never commit your production Storefront Token to version control. Use environment variables for production deployments.
+</Warning>
+
+## Storefront API
+
+The Shopify Storefront API is a GraphQL API that provides read access to your store's product catalog.
+
+### API Capabilities
+
+- **Products & Variants** - Query product data with all variants
+- **Collections** - Product groupings and filters
+- **Media** - Images, videos, and product media
+- **Metafields** - Custom fields on products and variants
+- **Cart Operations** - Create, update, and manage carts
+- **Checkout** - Customer checkout and payment processing
+
+### Authentication
+
+The Storefront API uses a public access token that's safe to use in client-side code. The token is configured via `storefrontToken` and used by Hydrogen's `ShopifyServerProvider`.
+
+From `App.server.jsx:15`:
+
+```jsx
+<ShopifyServerProvider shopifyConfig={shopifyConfig} {...serverState}>
+  {/* Your app */}
+</ShopifyServerProvider>
+```
+
+## GraphQL Queries
+
+### Product Queries
+
+The `useSanityQuery` hook automatically fetches products from Shopify using GraphQL fragments.
+
+#### Default Fragment
+
+By default, products are fetched using Hydrogen's `ProductProviderFragment`, which includes all fields needed for `<ProductProvider>`:
+
+```graphql
+fragment ProductProviderFragment on Product {
+  id
+  title
+  handle
+  descriptionHtml
+  media(first: 10) {
+    edges {
+      node {
+        ... on MediaImage {
+          id
+          image {
+            altText
+            url
+          }
+        }
+      }
+    }
+  }
+  variants(first: 250) {
+    edges {
+      node {
+        id
+        title
+        availableForSale
+        priceV2 {
+          amount
+          currencyCode
+        }
+        compareAtPriceV2 {
+          amount
+          currencyCode
+        }
+        selectedOptions {
+          name
+          value
+        }
+      }
+    }
+  }
+}
+```
+
+#### Custom Fragments
+
+You can customize which fields are fetched using `getProductGraphQLFragment`.
+
+From `pages/Index.server.jsx:27-47`:
+
+```jsx
+const {sanityData, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      mf:metafields(namespace:"tunemein", first:1){
+        edges {
+          node {
+            key
+            value
+          }
+        }
+      }
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+This extends the default fragment to include:
+- Custom metafields from the `tunemein` namespace
+- Additional product images beyond the default
+
+<Tip>
+Custom fragments can improve performance by fetching only the data you need. For product listings, you might exclude variant data to reduce payload size.
+</Tip>
+
+### Metafields
+
+Metafields allow you to attach custom data to products:
+
+```graphql
+mf:metafields(namespace:"tunemein", first:2){
+  edges {
+    node {
+      key
+      value
+    }
+  }
+}
+```
+
+Accessing metafields in code:
+
+```javascript
+const metafields = product.mf?.edges || [];
+const customField = metafields.find(e => e.node.key === 'custom_key');
+const value = customField?.node?.value;
+```
+
+## Product Data Structure
+
+### Response Format
+
+Products returned by `useSanityQuery` are normalized into an object map:
+
+```javascript
+const {shopifyProducts} = useSanityQuery({query: QUERY});
+
+// shopifyProducts structure:
+{
+  'shopifyProduct-7349334187288': {
+    id: 'Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzY2Mzk2Mjk5MjY0ODc=',
+    handle: 'red-tshirt',
+    title: 'Red T-shirt',
+    descriptionHtml: '<p>A comfortable red t-shirt</p>',
+    priceRange: {
+      minVariantPrice: { amount: '29.99', currencyCode: 'USD' },
+      maxVariantPrice: { amount: '29.99', currencyCode: 'USD' }
+    },
+    variants: {
+      edges: [
+        {
+          node: {
+            id: 'Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0VmFyaWFudC8...',
+            title: 'Small',
+            availableForSale: true,
+            priceV2: { amount: '29.99', currencyCode: 'USD' },
+            selectedOptions: [
+              { name: 'Size', value: 'Small' }
+            ]
+          }
+        }
+      ]
+    },
+    media: {
+      edges: [/* ... */]
+    }
+  },
+  'shopifyProduct-7342335787245': { /* ... */ }
+}
+```
+
+### Accessing Product Data
+
+Products are accessed by their Sanity ID:
+
+```javascript
+const sanityProductId = sanityProduct._id; // e.g., 'shopifyProduct-123'
+const shopifyData = shopifyProducts[sanityProductId];
+```
+
+Merging Sanity and Shopify data:
+
+```javascript
+const product = {
+  ...sanityProduct,           // Sanity fields (custom, editorial)
+  storefront: shopifyProducts[sanityProduct._id]  // Live Shopify data
+};
+```
+
+From `pages/Index.server.jsx:76-81`:
+
+```jsx
+<FeaturedCollection
+  title={featuredCollection1.title}
+  products={featuredCollection1.products.map((product) => {
+    return {
+      ...product.productData,
+      storefront: shopifyProducts?.[product?.productData._id],
+    };
+  })}
+/>
+```
+
+## Product Variants
+
+### Variant Selection
+
+Variants are stored in Sanity references and resolved from Shopify:
+
+From `fragments/productWithVariant.js:3-11`:
+
+```javascript
+export const PRODUCT_WITH_VARIANT = groq`
+  product->{
+    _id,
+    "available": !store.isDeleted && store.status == 'active',
+    "slug": store.slug.current,
+    store,
+    "variantId": coalesce(^.variant->store.id, store.variants[0]->store.id)
+  }
+`;
+```
+
+This fragment:
+1. References the product document
+2. Gets the selected variant (or defaults to first variant)
+3. Includes availability status from Sanity
+
+### Working with Variants
+
+From `pages/products/[handle].server.jsx:66-79`:
+
+```jsx
+const params = new URLSearchParams(props.search);
+const variantId = props?.variantId || params?.get('variant');
+const encodedVariantId = encode('ProductVariant', variantId);
+
+const flattenedVariants = flattenConnection(product.storefront.variants);
+const productVariantIndex = flattenedVariants.findIndex(
+  (variant) => variant.id === encodedVariantId,
+);
+
+const productVariant =
+  product.storefront?.variants?.edges[
+    productVariantIndex >= 0 ? productVariantIndex : 0
+  ];
+```
+
+This code:
+1. Gets variant ID from server state or URL params
+2. Encodes it to Shopify's Global ID format
+3. Finds the matching variant in the edges array
+4. Falls back to the first variant if not found
+
+<Note>
+Shopify uses Global IDs (base64-encoded strings like `Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0VmFyaWFudC8xMjM=`). The `encode` utility converts numeric IDs to this format.
+</Note>
+
+### Variant URLs
+
+Variants can be accessed via URL parameters:
+
+```
+/products/red-tshirt?variant=123456789
+```
+
+The `LinkProduct` component handles this automatically:
+
+```jsx
+<LinkProduct 
+  productId={product._id}
+  variantId={variant.id}
+>
+  View Product
+</LinkProduct>
+```
+
+## Product Provider Pattern
+
+Hydrogen's `<ProductProvider>` component provides product context to child components.
+
+From `pages/products/[handle].server.jsx:86-91`:
+
+```jsx
+<ProductProvider
+  product={product?.storefront}
+  initialVariantId={productVariant?.node?.id}
+>
+  <ProductDetails product={product} />
+</ProductProvider>
+```
+
+Child components can then use Hydrogen's product hooks:
+
+```jsx
+import {useProduct} from '@shopify/hydrogen/client';
+
+function ProductPrice() {
+  const {selectedVariant} = useProduct();
+  
+  return (
+    <div>
+      {selectedVariant.priceV2.amount} {selectedVariant.priceV2.currencyCode}
+    </div>
+  );
+}
+```
+
+## Collections
+
+Collections in Tune Me In are managed primarily in Sanity, but can reference Shopify collections.
+
+### Collection Structure
+
+From `pages/collections/[handle].server.jsx:24-43`:
+
+```jsx
+const {sanityData: sanityCollection, shopifyProducts} = useSanityQuery({
+  query: QUERY,
+  params: { slug: handle, start, end },
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+### Pagination
+
+Collections support server-side pagination:
+
+```javascript
+const pageSize = 6;
+const page = currentPage || 0;
+const start = page * pageSize;
+const end = start + (pageSize - 1);
+```
+
+The GROQ query uses array slicing:
+
+```groq
+products[available][$start..$end]
+```
+
+## Product Context Provider
+
+To avoid prop drilling, products are provided via React Context.
+
+From `pages/products/[handle].server.jsx:84`:
+
+```jsx
+<ProductsProvider value={shopifyProducts}>
+  <Layout>
+    {/* Products available to all children */}
+  </Layout>
+</ProductsProvider>
+```
+
+Accessing products in nested components:
+
+```jsx
+import {useProductsContext} from '../contexts/ProductsContext.client';
+
+function NestedProductCard({productId}) {
+  const product = useProductsContext(productId);
+  
+  return (
+    <div>
+      <h3>{product.title}</h3>
+      <p>{product.priceRange.minVariantPrice.amount}</p>
+    </div>
+  );
+}
+```
+
+## Cart Integration
+
+While not extensively covered in the core concepts, Tune Me In uses Hydrogen's cart functionality:
+
+```jsx
+import {CartProvider} from './contexts/CartProvider.client';
+
+<CartProvider>
+  {/* App content */}
+</CartProvider>
+```
+
+Components can add products to cart using Hydrogen's cart hooks:
+
+```jsx
+import {useCart} from '@shopify/hydrogen/client';
+
+function AddToCartButton({variantId}) {
+  const {linesAdd} = useCart();
+  
+  const handleClick = () => {
+    linesAdd([{
+      merchandiseId: variantId,
+      quantity: 1
+    }]);
+  };
+  
+  return <button onClick={handleClick}>Add to Cart</button>;
+}
+```
+
+## Best Practices
+
+### Performance Optimization
+
+1. **Fetch only needed fields** - Use custom fragments to reduce payload size
+2. **Paginate collections** - Don't load all products at once
+3. **Cache strategically** - Consider caching product data client-side
+4. **Use variants wisely** - Limit variant queries when showing many products
+
+### Data Freshness
+
+1. **Shopify data is always fresh** - Each request fetches live data from Shopify
+2. **Sanity uses CDN** - Content may be slightly delayed (seconds)
+3. **Handle out-of-stock** - Always check `availableForSale` before checkout
+4. **Validate variants** - Ensure selected variants still exist
+
+### Error Handling
+
+1. **Check product existence** - Products can be deleted in Shopify
+2. **Handle missing variants** - Default to first variant gracefully
+3. **Validate availability** - Products can become unavailable
+4. **Provide fallbacks** - Show alternative products when unavailable
+
+### Security
+
+1. **Use environment variables** - Never commit tokens to source control
+2. **Rotate tokens periodically** - Regenerate Storefront tokens regularly
+3. **Scope appropriately** - Use read-only tokens where possible
+4. **Monitor usage** - Track API usage to detect issues
+
+## Shopify Global IDs
+
+Shopify uses base64-encoded Global IDs for all resources:
+
+### Format
+
+```
+gid://shopify/Product/7349334187288
+```
+
+Encoded:
+```
+Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzczNDkzMzQxODcyODg=
+```
+
+### Encoding Helper
+
+From `utils/shopifyGid.js`:
+
+```javascript
+export function encode(type, id) {
+  return btoa(`gid://shopify/${type}/${id}`);
+}
+
+export function decode(gid) {
+  const decoded = atob(gid);
+  const match = decoded.match(/gid:\/\/shopify\/(\w+)\/(\d+)/);
+  return match ? { type: match[1], id: match[2] } : null;
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Data Fetching" icon="database" href="/concepts/data-fetching">
+    Learn how useSanityQuery unifies Sanity and Shopify data
+  </Card>
+  <Card title="Sanity Integration" icon="palette" href="/concepts/sanity-integration">
+    Understand how Sanity content references Shopify products
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    See how all the pieces fit together
+  </Card>
+</CardGroup>

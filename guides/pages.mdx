@@ -1,0 +1,371 @@
+---
+title: 'Pages'
+description: 'Creating pages and handling routing in Tune Me In'
+---
+
+# Pages
+
+Tune Me In uses Shopify Hydrogen's file-based routing system. Pages are defined as `.server.jsx` files in the `src/pages/` directory.
+
+## File-Based Routing
+
+Hydrogen automatically creates routes based on your file structure:
+
+```
+src/pages/
+├── Index.server.jsx              → /
+├── about.server.jsx              → /about
+├── collections/
+│   ├── index.server.jsx          → /collections
+│   ├── [handle].server.jsx       → /collections/:handle
+│   └── all-products.server.jsx   → /collections/all-products
+├── products/
+│   └── [handle].server.jsx       → /products/:handle
+├── editorial/
+│   └── [handle].server.jsx       → /editorial/:handle
+└── lifestyle/
+    ├── index.server.jsx          → /lifestyle
+    └── [handle].server.jsx       → /lifestyle/:handle
+```
+
+### Dynamic Routes
+
+Files with brackets `[handle]` create dynamic routes that accept parameters:
+
+- `[handle].server.jsx` - Matches any single segment
+- `[...slug].server.jsx` - Matches multiple segments (catch-all)
+
+## Creating a Basic Page
+
+<Steps>
+  <Step title="Create the page file">
+    Create a new `.server.jsx` file in `src/pages/`:
+    
+    ```jsx src/pages/about.server.jsx
+    import Layout from '../components/Layout.server';
+    
+    export default function About() {
+      return (
+        <Layout>
+          <div className="container mx-auto px-4 py-8">
+            <h1 className="text-4xl font-bold mb-4">About Tune Me In</h1>
+            <p className="text-lg">Welcome to our store...</p>
+          </div>
+        </Layout>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Add navigation links">
+    Link to your new page from the header or other components:
+    
+    ```jsx src/components/Header.server.jsx
+    import {Link} from '@shopify/hydrogen';
+    
+    export default function Header() {
+      return (
+        <nav>
+          <Link to="/about">About</Link>
+          <Link to="/collections/all-products">T-Shirts</Link>
+          <Link to="/lifestyle">Lifestyle</Link>
+        </nav>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Test the route">
+    Start your development server and navigate to `/about` to see your new page.
+  </Step>
+</Steps>
+
+## Dynamic Pages with Sanity CMS
+
+Tune Me In fetches content from Sanity CMS using the `useSanityQuery` hook:
+
+```jsx src/pages/products/[handle].server.jsx
+import groq from 'groq';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import {useParams} from 'react-router-dom';
+import {ProductProvider} from '@shopify/hydrogen/client';
+
+import Layout from '../../components/Layout.server';
+import NotFound from '../../components/NotFound.server';
+import ProductDetails from '../../components/ProductDetails.client';
+import {PRODUCT_PAGE} from '../../fragments/productPage';
+
+export default function Product() {
+  const {handle} = useParams();
+  
+  const {sanityData: sanityProduct, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+    params: {
+      slug: handle,
+    },
+    getProductGraphQLFragment: () => {
+      return `
+        ...ProductProviderFragment
+        images(first: 10) {
+          edges {
+            node {
+              altText
+              url
+            }
+          }
+        }
+      `;
+    },
+  });
+
+  const storefrontProduct = shopifyProducts?.[sanityProduct?._id];
+
+  if (!sanityProduct || !storefrontProduct) {
+    return <NotFound />;
+  }
+
+  const product = {
+    ...sanityProduct,
+    storefront: storefrontProduct,
+  };
+
+  return (
+    <Layout>
+      <ProductProvider product={product.storefront}>
+        <ProductDetails product={product} />
+      </ProductProvider>
+    </Layout>
+  );
+}
+
+const QUERY = groq`
+  *[
+    _type == 'product'
+    && store.slug.current == $slug
+  ][0]{
+    ${PRODUCT_PAGE}
+  }
+`;
+```
+
+## Collection Pages
+
+Collection pages display lists of products with pagination:
+
+```jsx src/pages/collections/[handle].server.jsx
+import groq from 'groq';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import {useParams} from 'react-router-dom';
+
+import Layout from '../../components/Layout.server';
+import ProductCard from '../../components/ProductCard.server';
+import CollectionHeader from '../../components/CollectionHeader.server';
+import CollectionPagination from '../../components/CollectionPagination.client';
+
+export default function Collection({currentPage}) {
+  const pageSize = 6;
+  const page = currentPage || 0;
+  const start = page * pageSize;
+  const end = start + (pageSize - 1);
+
+  const {handle} = useParams();
+  const {sanityData: sanityCollection, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+    params: {
+      slug: handle,
+      start,
+      end,
+    },
+  });
+
+  if (!sanityCollection) {
+    return <NotFound />;
+  }
+
+  const totalItems = sanityCollection.totalProducts;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  return (
+    <Layout>
+      <CollectionHeader
+        image={sanityCollection.image}
+        title={sanityCollection.title}
+      />
+      
+      <CollectionPagination totalPages={totalPages} currentPage={page} />
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {sanityCollection.products.map((sanityProduct) => (
+          <ProductCard
+            key={sanityProduct._id}
+            product={{
+              ...sanityProduct,
+              storefront: shopifyProducts?.[sanityProduct?._id],
+            }}
+          />
+        ))}
+      </div>
+      
+      <CollectionPagination totalPages={totalPages} currentPage={page} />
+    </Layout>
+  );
+}
+
+const QUERY = groq`
+  *[
+    _type == 'collection'
+    && slug.current == $slug
+  ][0]{
+    title,
+    "totalProducts": count(products[available]),
+    products[available][$start..$end]
+  }
+`;
+```
+
+## Homepage
+
+The homepage (`Index.server.jsx`) typically features multiple sections:
+
+```jsx src/pages/Index.server.jsx
+import groq from 'groq';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+
+import Layout from '../components/Layout.server';
+import HeroTriplet from '../components/simplistic/HeroTriplet.client';
+import FeaturedCollection from '../components/simplistic/FeaturedCollection.server';
+import BannerAnimated from '../components/simplistic/BannerAnimated.server';
+import Seo from '../components/Seo.client';
+
+export default function Index() {
+  const {sanityData: sanityPage, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+  });
+
+  const {
+    mainHero,
+    featuredCollection1,
+    featuredCollection2,
+    animatedBanner,
+  } = sanityPage;
+
+  return (
+    <Layout>
+      <HeroTriplet data={mainHero} />
+      
+      <FeaturedCollection
+        title={featuredCollection1.title}
+        products={featuredCollection1.products.map((product) => ({
+          ...product.productData,
+          storefront: shopifyProducts?.[product?.productData._id],
+        }))}
+      />
+      
+      <BannerAnimated data={animatedBanner} />
+      
+      <FeaturedCollection
+        title={featuredCollection2.title}
+        products={featuredCollection2.products.map((product) => ({
+          ...product.productData,
+          storefront: shopifyProducts?.[product?.productData._id],
+        }))}
+      />
+      
+      <Seo
+        page={{
+          description: sanityPage.seo?.description,
+          title: sanityPage.seo?.title,
+        }}
+      />
+    </Layout>
+  );
+}
+
+const QUERY = groq`
+  *[_id == 'home3'][0] {
+    mainHero,
+    featuredCollection1,
+    featuredCollection2,
+    animatedBanner,
+    seo
+  }
+`;
+```
+
+## Server-Side Rendering
+
+All pages in Hydrogen are server-rendered by default:
+
+- **Fast initial page loads** - HTML is generated on the server
+- **SEO-friendly** - Content is available to search engines
+- **Progressive enhancement** - Works without JavaScript
+
+## Handling 404 Errors
+
+Create a `NotFound` component for missing pages:
+
+```jsx src/components/NotFound.server.jsx
+import {Link} from '@shopify/hydrogen';
+
+export default function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <h1 className="text-4xl font-bold mb-4">404 - Page Not Found</h1>
+      <p className="text-lg mb-8">The page you're looking for doesn't exist.</p>
+      <Link to="/" className="text-blue-500 hover:underline">
+        Return to Home
+      </Link>
+    </div>
+  );
+}
+```
+
+Use it in your pages:
+
+```jsx
+if (!sanityProduct) {
+  return <NotFound />;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep pages server-rendered">
+    Pages should always be `.server.jsx` files. Move interactivity to client components.
+  </Accordion>
+  
+  <Accordion title="Use proper SEO">
+    Always include the `Seo` component with relevant metadata:
+    
+    ```jsx
+    <Seo
+      page={{
+        title: product.seo?.title || product.title,
+        description: product.seo?.description,
+        image: product.seo?.image,
+        type: 'product',
+      }}
+    />
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle loading states">
+    Consider showing loading indicators while data is being fetched.
+  </Accordion>
+  
+  <Accordion title="Implement proper error handling">
+    Always check if data exists before rendering and show appropriate error pages.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Product Listings" icon="grid" href="/guides/product-listings">
+    Learn how to build product listing and detail pages
+  </Card>
+  <Card title="Portable Text" icon="text" href="/guides/portable-text">
+    Add rich editorial content with Portable Text
+  </Card>
+</CardGroup>

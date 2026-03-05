@@ -1,0 +1,411 @@
+---
+title: 'Portable Text'
+description: 'Working with Portable Text for rich editorial content'
+---
+
+# Portable Text
+
+Portable Text is Sanity's rich text format that allows you to create structured content with custom blocks, annotations, and inline components. Tune Me In uses it extensively for product descriptions and editorial content.
+
+## What is Portable Text?
+
+Portable Text is a JSON-based rich text specification that:
+
+- Stores content as structured data (not HTML)
+- Supports custom blocks and inline elements
+- Allows embedding of products, images, and other content types
+- Is framework-agnostic and portable
+
+## The PortableText Component
+
+Tune Me In provides a `PortableText` component that renders Sanity's Portable Text:
+
+```jsx src/components/PortableText.client.jsx
+import BlockContent from '@sanity/block-content-to-react';
+
+import AnnotationLinkEmail from './annotations/AnnotationLinkEmail';
+import AnnotationLinkExternal from './annotations/AnnotationLinkExternal';
+import AnnotationLinkInternal from './annotations/AnnotationLinkInternal';
+import AnnotationProduct from './annotations/AnnotationProduct.client';
+import Block from './blocks/Block.client';
+import BlockImage from './blocks/BlockImage.client';
+import BlockInlineProduct from './blocks/BlockInlineProduct.client';
+import BlockProduct from './blocks/BlockProduct.client';
+
+const portableTextMarks = {
+  annotationLinkEmail: AnnotationLinkEmail,
+  annotationLinkExternal: AnnotationLinkExternal,
+  annotationLinkInternal: AnnotationLinkInternal,
+  annotationProduct: AnnotationProduct,
+  strong: (props) => <strong>{props.children}</strong>,
+};
+
+const PortableText = (props) => {
+  const {blocks, className} = props;
+
+  return (
+    <div className={className}>
+      <BlockContent
+        blocks={blocks}
+        className="portableText"
+        renderContainerOnSingleChild
+        serializers={{
+          marks: portableTextMarks,
+          types: {
+            block: Block,
+            blockImage: BlockImage,
+            blockProduct: BlockProduct,
+            blockInlineProduct: BlockInlineProduct,
+          },
+        }}
+      />
+    </div>
+  );
+};
+
+export default PortableText;
+```
+
+## Using Portable Text in Pages
+
+### Product Descriptions
+
+Render product body content with Portable Text:
+
+```jsx
+import PortableText from '../components/PortableText.client';
+
+export default function ProductDetails({product}) {
+  return (
+    <div>
+      <h1>{product.title}</h1>
+      
+      {product?.body && (
+        <div className="max-w-2xl">
+          <PortableText blocks={product.body} />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Editorial Content
+
+```jsx
+export default function Article({article}) {
+  return (
+    <article className="prose lg:prose-xl">
+      <h1>{article.title}</h1>
+      <PortableText blocks={article.content} />
+    </article>
+  );
+}
+```
+
+## Custom Blocks
+
+Portable Text supports custom block types. Here's how Tune Me In implements them:
+
+### Image Blocks
+
+```jsx src/components/blocks/BlockImage.client.jsx
+import SanityImage from '../SanityImage.client';
+
+export default function BlockImage({node}) {
+  return (
+    <div className="my-8">
+      <SanityImage
+        alt={node.alt}
+        crop={node.crop}
+        dataset={sanityConfig.dataset}
+        hotspot={node.hotspot}
+        layout="responsive"
+        projectId={sanityConfig.projectId}
+        sizes="100vw"
+        src={node.asset._ref}
+      />
+      {node.caption && (
+        <p className="text-sm text-gray-500 mt-2">{node.caption}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Product Blocks
+
+```jsx src/components/blocks/BlockProduct.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+import ButtonSelectedVariantAddToCart from '../ButtonSelectedVariantAddToCart.client';
+
+export default function BlockProduct({node}) {
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return null;
+  }
+
+  return (
+    <Product product={storefrontProduct}>
+      <div className="my-8 border border-gray-200 p-4">
+        <Product.SelectedVariant.Image
+          className="w-full mb-4"
+          options={{width: 600}}
+        />
+        <Product.Title className="text-xl font-bold mb-2" />
+        <Product.SelectedVariant.Price className="text-lg mb-4" />
+        <ButtonSelectedVariantAddToCart />
+      </div>
+    </Product>
+  );
+}
+```
+
+## Inline Product References
+
+One of Tune Me In's most powerful features is inline product references that appear as interactive tooltips:
+
+```jsx src/components/blocks/BlockInlineProduct.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import Tippy from '@tippyjs/react/headless';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+import ButtonSelectedVariantAddToCart from '../ButtonSelectedVariantAddToCart.client';
+import LinkProduct from '../LinkProduct.client';
+
+const BlockInlineProduct = (props) => {
+  const {node} = props;
+  const product = node?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return '(Product not found)';
+  }
+
+  return (
+    <Tippy
+      interactive
+      placement="top"
+      render={(attrs) => (
+        <Product product={storefrontProduct}>
+          <div className="bg-white border border-black p-2 text-sm" {...attrs}>
+            <div className="w-44">
+              <LinkProduct handle={storefrontProduct.handle}>
+                <Product.Title className="font-medium" />
+              </LinkProduct>
+              <Product.Price />
+              <Product.SelectedVariant.Image
+                className="my-2 w-full"
+                options={{width: 300, height: 250, crop: 'center'}}
+              />
+              {node?.action === 'addToCart' && (
+                <ButtonSelectedVariantAddToCart small />
+              )}
+            </div>
+          </div>
+        </Product>
+      )}
+    >
+      <span>
+        <LinkProduct
+          className="text-blue-500 font-medium hover:opacity-60"
+          handle={storefrontProduct.handle}
+        >
+          {storefrontProduct.title}
+        </LinkProduct>
+      </span>
+    </Tippy>
+  );
+};
+
+export default BlockInlineProduct;
+```
+
+**Result:** When users hover over a product mention in text, they see a popup with the product image, price, and an "Add to Cart" button.
+
+## Annotations (Inline Marks)
+
+Annotations are inline marks applied to text, like links or product references.
+
+### Product Annotations
+
+Turn text into clickable product links with add-to-cart functionality:
+
+```jsx src/components/annotations/AnnotationProduct.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+import {ShoppingCartIcon} from '@heroicons/react/outline';
+import {useProductsContext} from '../../contexts/ProductsContext.client';
+
+const AnnotationProduct = (props) => {
+  const {children, mark} = props;
+  const product = mark?.productWithVariant?.product;
+  const storefrontProduct = useProductsContext(product?._id);
+
+  if (!storefrontProduct) {
+    return children;
+  }
+
+  return (
+    <Product product={storefrontProduct}>
+      {mark?.action === 'addToCart' && (
+        <Product.SelectedVariant.AddToCartButton quantity={mark?.quantity || 1}>
+          <span className="text-blue-500 underline font-medium hover:opacity-60 flex items-center">
+            {children}
+            <ShoppingCartIcon className="h-4 ml-0.5 w-4" />
+          </span>
+        </Product.SelectedVariant.AddToCartButton>
+      )}
+    </Product>
+  );
+};
+
+export default AnnotationProduct;
+```
+
+### Link Annotations
+
+```jsx src/components/annotations/AnnotationLinkExternal.jsx
+export default function AnnotationLinkExternal({mark, children}) {
+  return (
+    <a
+      href={mark?.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-500 underline hover:opacity-60"
+    >
+      {children}
+    </a>
+  );
+}
+```
+
+## Creating Custom Blocks
+
+<Steps>
+  <Step title="Create the block component">
+    Create a new component in `src/components/blocks/`:
+    
+    ```jsx src/components/blocks/BlockCallout.client.jsx
+    export default function BlockCallout({node}) {
+      const styles = {
+        info: 'bg-blue-100 border-blue-500',
+        warning: 'bg-yellow-100 border-yellow-500',
+        error: 'bg-red-100 border-red-500',
+      };
+      
+      return (
+        <div className={`border-l-4 p-4 my-4 ${styles[node.type] || styles.info}`}>
+          {node.title && <h4 className="font-bold mb-2">{node.title}</h4>}
+          <p>{node.text}</p>
+        </div>
+      );
+    }
+    ```
+  </Step>
+  
+  <Step title="Register the block in PortableText">
+    Add your block to the serializers:
+    
+    ```jsx src/components/PortableText.client.jsx
+    import BlockCallout from './blocks/BlockCallout.client';
+    
+    const PortableText = (props) => {
+      return (
+        <BlockContent
+          blocks={props.blocks}
+          serializers={{
+            types: {
+              block: Block,
+              blockCallout: BlockCallout,
+              // ... other blocks
+            },
+          }}
+        />
+      );
+    };
+    ```
+  </Step>
+  
+  <Step title="Define the schema in Sanity Studio">
+    Create the corresponding schema in your Sanity Studio:
+    
+    ```js
+    {
+      name: 'blockCallout',
+      type: 'object',
+      fields: [
+        {name: 'title', type: 'string'},
+        {name: 'text', type: 'text'},
+        {name: 'type', type: 'string', options: {
+          list: ['info', 'warning', 'error']
+        }}
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+## ProductsProvider Context
+
+To access Shopify product data in Portable Text components, wrap your content with `ProductsProvider`:
+
+```jsx
+import ProductsProvider from '../contexts/ProductsProvider.client';
+
+export default function Product({product, shopifyProducts}) {
+  return (
+    <ProductsProvider value={shopifyProducts}>
+      <Layout>
+        <PortableText blocks={product.body} />
+      </Layout>
+    </ProductsProvider>
+  );
+}
+```
+
+Components can then access products using:
+
+```jsx
+import {useProductsContext} from '../contexts/ProductsContext.client';
+
+const storefrontProduct = useProductsContext(product?._id);
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep blocks focused">
+    Each block component should render a single type of content. Don't create "super blocks" that try to do too much.
+  </Accordion>
+  
+  <Accordion title="Handle missing data gracefully">
+    Always check if data exists before rendering:
+    
+    ```jsx
+    if (!storefrontProduct) {
+      return null; // or a fallback UI
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Style with Tailwind">
+    Use Tailwind utility classes for consistent styling across all blocks.
+  </Accordion>
+  
+  <Accordion title="Test with different content">
+    Test your blocks with various content combinations to ensure they work in all scenarios.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Components" icon="cube" href="/guides/components">
+    Learn more about creating custom components
+  </Card>
+  <Card title="Styling" icon="palette" href="/guides/styling">
+    Style your Portable Text blocks with Tailwind CSS
+  </Card>
+</CardGroup>

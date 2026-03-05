@@ -1,0 +1,424 @@
+---
+title: "Client Components"
+description: "React Client Components for interactive UI elements"
+---
+
+Client components in Tune Me In handle client-side interactivity, state management, and user interactions. They run in the browser and can use React hooks.
+
+## Cart
+
+Full-featured shopping cart with slide-out panel.
+
+### Features
+- Slide-out cart panel from right side
+- Cart line items with quantity adjustment
+- Remove items functionality
+- Subtotal and total calculation
+- Checkout button
+- Error handling
+- Overlay backdrop
+
+### Cart Line Items
+
+Each line item displays:
+- Product image (links to product page)
+- Product title and selected options
+- Quantity controls (+/-)
+- Remove button
+- Line item price
+
+### Usage Example
+
+```jsx
+import Cart from './components/Cart.client';
+
+<Cart />
+```
+
+**Source:** `src/components/Cart.client.jsx:20`
+
+---
+
+## ProductDetails
+
+Complete product detail page with images, options, and actions.
+
+<ParamField path="product" type="object" required>
+  Product object containing:
+  - `storefront` - Shopify product data
+  - `images` - Array of Sanity image objects
+  - `body` - Portable text content
+  - `sections` - Array of collapsible sections
+</ParamField>
+
+<ParamField path="initialVariantId" type="string" required>
+  Encoded Shopify variant ID for the initially selected variant
+</ParamField>
+
+### Features
+- Selected variant image display
+- Image gallery
+- Product body content (Portable Text)
+- Product title and pricing
+- Compare at price
+- Product options selector
+- Add to cart button
+- Buy now button
+- Collapsible sections (Details, Shipping, etc.)
+- Responsive layout (2-3 columns)
+
+### Usage Example
+
+```jsx
+import ProductDetails from './components/ProductDetails.client';
+
+<ProductDetails 
+  product={{
+    storefront: shopifyProduct,
+    images: sanityImages,
+    body: portableTextBlocks,
+    sections: [...]
+  }}
+  initialVariantId={encodedVariantId}
+/>
+```
+
+**Source:** `src/components/ProductDetails.client.jsx:11`
+
+---
+
+## ProductGallery
+
+Displays a grid of product images.
+
+<ParamField path="images" type="array" required>
+  Array of Sanity image objects with:
+  - `_key` - Unique identifier
+  - `asset._ref` - Sanity image reference
+  - `altText` - Alt text for accessibility
+  - `crop` - Crop data
+  - `hotspot` - Hotspot data
+</ParamField>
+
+### Features
+- Responsive grid layout (1-2 columns)
+- Sanity image optimization
+- 4:3 aspect ratio containers
+- Handles missing images gracefully
+
+### Usage Example
+
+```jsx
+import ProductGallery from './components/ProductGallery.client';
+
+<ProductGallery images={[
+  {
+    _key: 'img1',
+    asset: { _ref: 'image-xxx' },
+    altText: 'Product photo',
+    crop: {...},
+    hotspot: {...}
+  }
+]} />
+```
+
+**Source:** `src/components/ProductGallery.client.jsx:4`
+
+---
+
+## ProductOptions
+
+Interactive product variant selector (size, color, etc.).
+
+### Features
+- Displays all product options from Shopify
+- Radio button selection
+- Visual feedback for selected option
+- Updates URL with selected variant
+- Auto-hides for single-variant products
+- Integrates with Hydrogen's `useProduct` hook
+
+### Usage Example
+
+```jsx
+import ProductOptions from './components/ProductOptions.client';
+
+// Must be used within a Hydrogen Product provider
+<Product product={product}>
+  <ProductOptions />
+</Product>
+```
+
+**Source:** `src/components/ProductOptions.client.jsx:6`
+
+---
+
+## SanityImage
+
+Optimized image component for Sanity CMS images.
+
+<ParamField path="alt" type="string">
+  Alt text for the image
+</ParamField>
+
+<ParamField path="crop" type="object">
+  Sanity crop data (top, bottom, left, right)
+</ParamField>
+
+<ParamField path="dataset" type="string" required>
+  Sanity dataset name
+</ParamField>
+
+<ParamField path="height" type="number">
+  Original image height
+</ParamField>
+
+<ParamField path="hotspot" type="object">
+  Sanity hotspot data for focal point
+</ParamField>
+
+<ParamField path="layout" type="string">
+  Image layout: `"fill"` or `"responsive"`
+</ParamField>
+
+<ParamField path="objectFit" type="string">
+  CSS object-fit value (when layout is "fill")
+</ParamField>
+
+<ParamField path="projectId" type="string" required>
+  Sanity project ID
+</ParamField>
+
+<ParamField path="quality" type="number" default={80}>
+  Image quality (1-100)
+</ParamField>
+
+<ParamField path="sizes" type="array | string">
+  Responsive sizes for srcset
+</ParamField>
+
+<ParamField path="src" type="string" required>
+  Sanity image reference ID
+</ParamField>
+
+<ParamField path="width" type="number">
+  Original image width
+</ParamField>
+
+### Features
+- Automatic srcset generation for responsive images
+- Respects Sanity crop and hotspot
+- Automatic format selection
+- Lazy loading with async decoding
+- Calculates aspect ratio from dimensions
+- Supports fill and responsive layouts
+
+### Usage Example
+
+```jsx
+import SanityImage from './components/SanityImage.client';
+import sanityConfig from '../sanity.config';
+
+<SanityImage
+  alt="Product image"
+  crop={image.crop}
+  dataset={sanityConfig.dataset}
+  hotspot={image.hotspot}
+  layout="fill"
+  objectFit="cover"
+  projectId={sanityConfig.projectId}
+  sizes={['100vw', null, '50vw']}
+  src={image.asset._ref}
+/>
+```
+
+**Source:** `src/components/SanityImage.client.jsx:54`
+
+---
+
+## Button
+
+Basic button component with consistent styling.
+
+<ParamField path="children" type="ReactNode" required>
+  Button content
+</ParamField>
+
+### Features
+- Full width display
+- Black background with white text
+- Disabled state styling
+- Small text size
+
+### Usage Example
+
+```jsx
+import Button from './components/Button.client';
+
+<Button>Click me</Button>
+```
+
+**Source:** `src/components/Button.client.jsx:1`
+
+---
+
+## CollectionCard
+
+Displays a collection with image and title overlay.
+
+<ParamField path="collection" type="object" required>
+  Collection object containing:
+  - `slug` - Collection URL slug
+  - `title` - Collection name
+  - `image` - Sanity image object
+</ParamField>
+
+### Features
+- Image with overlay effect on hover
+- Centered title text
+- 4:3 aspect ratio
+- Links to collection page
+- Responsive text sizing
+
+### Usage Example
+
+```jsx
+import CollectionCard from './components/CollectionCard.client';
+
+<CollectionCard collection={{
+  slug: 'summer-collection',
+  title: 'Summer 2024',
+  image: sanityImage
+}} />
+```
+
+**Source:** `src/components/CollectionCard.client.jsx:7`
+
+---
+
+## LinkProduct
+
+Wrapper for product links with variant support.
+
+<ParamField path="handle" type="string" required>
+  Product handle (slug) in Shopify
+</ParamField>
+
+<ParamField path="variantId" type="string">
+  Unencoded variant ID to link to specific variant
+</ParamField>
+
+<ParamField path="className" type="string">
+  CSS classes for styling
+</ParamField>
+
+<ParamField path="onClick" type="function">
+  Click handler function
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Link content
+</ParamField>
+
+### Features
+- Builds product URLs with optional variant query param
+- Updates Hydrogen server state with variant ID
+- Graceful fallback if no handle provided
+- Integrates with Hydrogen's client-side navigation
+
+### Usage Example
+
+```jsx
+import LinkProduct from './components/LinkProduct.client';
+
+<LinkProduct 
+  handle="cool-tshirt"
+  variantId="12345"
+  className="text-blue-500"
+>
+  View Product
+</LinkProduct>
+```
+
+**Source:** `src/components/LinkProduct.client.jsx:9`
+
+---
+
+## CartToggleButton
+
+Button to open/close the cart panel.
+
+### Features
+- Uses CartUI context for state management
+- Displays CartIcon component
+- Cursor pointer on hover
+
+### Usage Example
+
+```jsx
+import CartToggleButton from './components/CartToggleButton.client';
+
+<CartToggleButton />
+```
+
+**Source:** `src/components/CartToggleButton.client.jsx:4`
+
+---
+
+## Seo
+
+Client component for managing page SEO metadata.
+
+<ParamField path="defaultImage" type="object">
+  Default Sanity image for OpenGraph
+</ParamField>
+
+<ParamField path="defaultTitle" type="string">
+  Default site title
+</ParamField>
+
+<ParamField path="page" type="object">
+  Page-specific SEO data:
+  - `title` - Page title
+  - `description` - Meta description
+  - `keywords` - Array of keywords
+  - `image` - Sanity image object
+  - `type` - OpenGraph type
+  - `price` - Product price object
+  - `product` - Full product data for schema.org
+</ParamField>
+
+### Features
+- OpenGraph tags
+- Twitter card metadata
+- Product schema.org JSON-LD
+- Dynamic title templates
+- Supports both global and page-specific SEO
+
+### Usage Example
+
+```jsx
+import Seo from './components/Seo.client';
+
+// Global SEO (in App.server.jsx)
+<Seo 
+  defaultTitle="Tune Me In"
+  defaultImage={sanityImage}
+/>
+
+// Page-specific SEO
+<Seo 
+  defaultTitle="Tune Me In"
+  page={{
+    title: 'Cool T-Shirt',
+    description: 'The coolest shirt ever',
+    keywords: ['tshirt', 'apparel'],
+    image: productImage,
+    type: 'product',
+    price: { amount: '29.99', currencyCode: 'USD' },
+    product: shopifyProduct
+  }}
+/>
+```
+
+**Source:** `src/components/Seo.client.jsx:21`

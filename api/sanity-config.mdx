@@ -1,0 +1,166 @@
+---
+title: 'sanity.config.js'
+description: 'Configure Sanity CMS integration for your Tune Me In storefront'
+---
+
+## Overview
+
+The `sanity.config.js` file contains the core configuration for connecting your Shopify Hydrogen storefront to Sanity CMS. This configuration is used throughout the application to fetch content, build image URLs, and interact with your Sanity project.
+
+## Configuration File
+
+Location: `sanity.config.js` (project root)
+
+```javascript
+export default {
+  apiVersion: 'v2021-06-07',
+  dataset: 'production',
+  projectId: 'wfr1r0dw',
+  useCdn: true,
+};
+```
+
+## Configuration Options
+
+<ParamField path="projectId" type="string" required>
+  Your Sanity project ID. This uniquely identifies your Sanity project and is required for all API requests.
+  
+  **Example:** `'wfr1r0dw'`
+  
+  **How to find:** Available in your Sanity project settings at [sanity.io/manage](https://sanity.io/manage)
+</ParamField>
+
+<ParamField path="dataset" type="string" required>
+  The Sanity dataset to use. Datasets allow you to have multiple content environments (e.g., production, staging, development).
+  
+  **Example:** `'production'`
+  
+  **Default datasets:** `'production'`, `'staging'`, `'development'`
+</ParamField>
+
+<ParamField path="apiVersion" type="string" required>
+  The Sanity API version to use. This ensures consistent API behavior and allows you to opt-in to new features.
+  
+  **Example:** `'v2021-06-07'`
+  
+  **Format:** Date string in `YYYY-MM-DD` format prefixed with `v`
+  
+  **Recommendation:** Use the date when you first set up your project or when you want to lock in specific API behavior
+</ParamField>
+
+<ParamField path="useCdn" type="boolean" default="true">
+  Whether to use Sanity's Content Delivery Network (CDN) for faster content delivery.
+  
+  **When to use `true`:**
+  - Production environments
+  - Read-heavy applications
+  - When you want faster response times
+  - Content can be up to a few seconds behind
+  
+  **When to use `false`:**
+  - Development environments where you need real-time updates
+  - When you need guaranteed fresh content
+  - For authenticated requests or draft content
+</ParamField>
+
+## Usage in Application
+
+The Sanity configuration is imported and used throughout the application:
+
+### Image URL Generation
+
+In `src/utils/sanityImageUrl.js`:
+
+```javascript
+import imageUrlBuilder from '@sanity/image-url';
+import sanityConfig from '../../sanity.config';
+
+const builder = imageUrlBuilder({
+  dataset: sanityConfig.dataset,
+  projectId: sanityConfig.projectId,
+});
+```
+
+### Component Integration
+
+The configuration is imported in various components for image processing:
+
+- `src/components/blocks/BlockImage.client.jsx`
+- `src/components/ProductGallery.client.jsx`
+- `src/components/GalleryCarousel.client.jsx`
+- `src/components/CollectionCard.client.jsx`
+
+### Shopify Config Integration
+
+The Sanity config is also embedded in the Shopify configuration:
+
+```javascript
+import sanityConfig from './sanity.config';
+
+export default {
+  // ... other config
+  sanity: sanityConfig,
+};
+```
+
+## Environment-Specific Configuration
+
+For different environments, you can create separate configuration files:
+
+```javascript
+// sanity.config.js
+const isProd = process.env.NODE_ENV === 'production';
+
+export default {
+  apiVersion: 'v2021-06-07',
+  dataset: isProd ? 'production' : 'development',
+  projectId: 'wfr1r0dw',
+  useCdn: isProd,
+};
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use CDN in Production">
+    Always set `useCdn: true` in production for better performance. The CDN provides:
+    - Faster response times
+    - Reduced load on your origin server
+    - Global edge caching
+  </Accordion>
+  
+  <Accordion title="Lock API Version">
+    Use a specific API version rather than `'latest'` to ensure consistent behavior across deployments. Update the version intentionally when you want to adopt new features.
+  </Accordion>
+  
+  <Accordion title="Separate Datasets">
+    Use different datasets for different environments:
+    - `production` for live content
+    - `staging` for pre-production testing
+    - `development` for local development
+  </Accordion>
+  
+  <Accordion title="Version Control">
+    Commit your `sanity.config.js` file to version control, but ensure sensitive tokens are stored in environment variables if needed.
+  </Accordion>
+</AccordionGroup>
+
+## Related Configuration
+
+- [shopify.config.js](/api/shopify-config) - Shopify configuration that includes Sanity config
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Images Not Loading">
+    Verify that your `projectId` and `dataset` are correct. Image URLs are built using these values and incorrect configuration will result in 404 errors.
+  </Accordion>
+  
+  <Accordion title="Stale Content in Development">
+    If you're seeing outdated content while developing, set `useCdn: false` to bypass the CDN cache and get real-time updates.
+  </Accordion>
+  
+  <Accordion title="API Version Errors">
+    If you receive API version errors, check the [Sanity API versioning documentation](https://www.sanity.io/docs/api-versioning) for the correct format and available versions.
+  </Accordion>
+</AccordionGroup>

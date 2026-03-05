@@ -1,0 +1,425 @@
+---
+title: 'Custom Hooks'
+description: 'Utility hooks for adaptive images, timeouts, toggles, and previous values'
+icon: 'function'
+---
+
+## Overview
+
+Tune Me In includes several custom React hooks for common UI patterns and functionality. These hooks provide reusable logic for adaptive image sizing, managing timeouts, toggling boolean states, and tracking previous values.
+
+## useAdaptiveImage
+
+Hook for dynamically calculating optimal image sizes based on container dimensions and screen size.
+
+### Import
+
+```javascript
+import useAdaptiveImage from '../hooks/useAdaptiveImage';
+```
+
+### Parameters
+
+<ParamField path="imageRef" type="HTMLElement">
+  Reference to the image DOM element (from `useRef` or `ref` callback)
+</ParamField>
+
+<ParamField path="adaptiveSize" type="boolean">
+  Whether to enable adaptive sizing. When `false`, returns default values.
+</ParamField>
+
+### Return Value
+
+<ResponseField name="boundingRect" type="DOMRect | null">
+  The bounding rectangle of the image element
+</ResponseField>
+
+<ResponseField name="preferredWidth" type="number | null">
+  The calculated preferred width from the set: `[200, 400, 600, 900, 1200, 1600]`
+</ResponseField>
+
+<ResponseField name="isAdaptive" type="boolean">
+  Whether adaptive sizing is currently active
+</ResponseField>
+
+### Usage Example
+
+```javascript
+import {useRef} from 'react';
+import useAdaptiveImage from '../hooks/useAdaptiveImage';
+
+function ResponsiveImage({src, alt}) {
+  const imageRef = useRef(null);
+  const {preferredWidth, isAdaptive} = useAdaptiveImage(imageRef.current, true);
+
+  const imageUrl = preferredWidth
+    ? `${src}?w=${preferredWidth}`
+    : src;
+
+  return (
+    <img
+      ref={imageRef}
+      src={imageUrl}
+      alt={alt}
+      className="responsive-image"
+    />
+  );
+}
+```
+
+### How It Works
+
+1. Listens for window resize events
+2. Calculates the current image container width
+3. Rounds down to nearest 100px
+4. Selects the closest preferred size from `[200, 400, 600, 900, 1200, 1600]`
+5. Re-calculates when screen dimensions change
+
+### Preferred Sizes
+
+The hook uses these predefined sizes for optimal image delivery:
+
+```javascript
+const preferredSizes = [200, 400, 600, 900, 1200, 1600];
+```
+
+These sizes are chosen to balance image quality with performance across common device widths.
+
+---
+
+## useTimeout
+
+Hook for managing setTimeout with automatic cleanup and reset functionality.
+
+### Import
+
+```javascript
+import useTimeout from '../hooks/useTimeout';
+```
+
+### Parameters
+
+<ParamField path="callback" type="function" required>
+  The function to execute after the delay
+</ParamField>
+
+<ParamField path="delay" type="number" required>
+  Delay in milliseconds before executing the callback
+</ParamField>
+
+### Return Value
+
+<ResponseField name="reset" type="function">
+  Function to clear and restart the timeout
+</ResponseField>
+
+<ResponseField name="clear" type="function">
+  Function to clear the timeout without restarting
+</ResponseField>
+
+### Usage Example
+
+```javascript
+import {useState} from 'react';
+import useTimeout from '../hooks/useTimeout';
+
+function SearchInput() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+
+  const searchCallback = () => {
+    if (query) {
+      // Perform search after user stops typing
+      fetch(`/api/search?q=${query}`)
+        .then(res => res.json())
+        .then(setResults);
+    }
+  };
+
+  const {reset} = useTimeout(searchCallback, 500);
+
+  const handleChange = (e) => {
+    setQuery(e.target.value);
+    reset(); // Reset timeout on each keystroke
+  };
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={query}
+        onChange={handleChange}
+        placeholder="Search..."
+      />
+      {/* Render results */}
+    </div>
+  );
+}
+```
+
+### Features
+
+- Automatically sets up timeout on mount and when dependencies change
+- Cleans up timeout on unmount
+- Callback reference is kept up to date without resetting the timer
+- Provides manual control with `reset()` and `clear()` functions
+
+---
+
+## useToggle
+
+Hook for managing boolean state with toggle functionality.
+
+### Import
+
+```javascript
+import {useToggle} from '../hooks';
+// or
+import useToggle from '../hooks/useToggle';
+```
+
+### Parameters
+
+<ParamField path="defaultValue" type="boolean">
+  The initial boolean value (defaults to `undefined`)
+</ParamField>
+
+### Return Value
+
+Returns a tuple `[value, toggleValue]`:
+
+<ResponseField name="value" type="boolean">
+  The current boolean value
+</ResponseField>
+
+<ResponseField name="toggleValue" type="function">
+  Function to toggle or set the value
+  
+  **Signature:**
+  ```typescript
+  (newValue?: boolean) => void
+  ```
+  
+  - Called with no arguments: toggles the current value
+  - Called with a boolean: sets the value explicitly
+</ResponseField>
+
+### Usage Examples
+
+#### Basic Toggle
+
+```javascript src/components/simplistic/ProductCardDetails.client.jsx
+import {useToggle} from '../../hooks';
+
+function ProductCardDetails() {
+  const [isHovering, setIsHovering] = useToggle(false);
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      className={`product-card ${isHovering ? 'hovered' : ''}`}
+    >
+      {/* Product content */}
+    </div>
+  );
+}
+```
+
+#### Modal Example
+
+```javascript
+import {useToggle} from '../hooks';
+
+function ModalTrigger() {
+  const [isOpen, setIsOpen] = useToggle(false);
+
+  return (
+    <>
+      <button onClick={() => setIsOpen()}>Toggle Modal</button>
+      <button onClick={() => setIsOpen(true)}>Open Modal</button>
+      <button onClick={() => setIsOpen(false)}>Close Modal</button>
+      
+      {isOpen && (
+        <Modal onClose={() => setIsOpen(false)}>
+          <p>Modal content</p>
+        </Modal>
+      )}
+    </>
+  );
+}
+```
+
+#### Menu Example
+
+```javascript
+function NavigationMenu() {
+  const [isExpanded, toggleExpanded] = useToggle(false);
+
+  return (
+    <nav>
+      <button onClick={() => toggleExpanded()}>
+        {isExpanded ? 'Collapse' : 'Expand'} Menu
+      </button>
+      
+      {isExpanded && (
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+      )}
+    </nav>
+  );
+}
+```
+
+---
+
+## usePrevious
+
+Hook for tracking the previous value of a variable across renders.
+
+### Import
+
+```javascript
+import usePrevious from '../hooks/usePrevious';
+```
+
+### Parameters
+
+<ParamField path="value" type="any" required>
+  The value to track. Can be any type.
+</ParamField>
+
+### Return Value
+
+<ResponseField name="previousValue" type="any">
+  The value from the previous render, or `undefined` on first render
+</ResponseField>
+
+### Usage Example
+
+```javascript src/components/simplistic/HeaderScroll.client.jsx
+import {useState, useEffect} from 'react';
+import {useLocation} from 'react-router-dom';
+import usePrevious from '../../hooks/usePrevious';
+
+function HeaderScroll() {
+  const location = useLocation();
+  const prevLocation = usePrevious(location.pathname);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // Close mobile menu when route changes
+    if (location.pathname !== prevLocation) {
+      setMobileMenuOpen(false);
+    }
+  }, [location, prevLocation]);
+
+  return (
+    <header>
+      {/* Header content */}
+    </header>
+  );
+}
+```
+
+### Common Use Cases
+
+#### Detecting Value Changes
+
+```javascript
+function AnimatedCounter({count}) {
+  const prevCount = usePrevious(count);
+  const isIncreasing = count > (prevCount ?? 0);
+
+  return (
+    <div className={isIncreasing ? 'counting-up' : 'counting-down'}>
+      {count}
+    </div>
+  );
+}
+```
+
+#### Comparing Props
+
+```javascript
+function UserProfile({userId}) {
+  const prevUserId = usePrevious(userId);
+  
+  useEffect(() => {
+    if (userId !== prevUserId) {
+      console.log(`User changed from ${prevUserId} to ${userId}`);
+      // Fetch new user data
+    }
+  }, [userId, prevUserId]);
+
+  return <div>{/* Profile content */}</div>;
+}
+```
+
+#### Tracking Form Changes
+
+```javascript
+function FormWithUnsavedChanges({initialData}) {
+  const [formData, setFormData] = useState(initialData);
+  const prevFormData = usePrevious(formData);
+  const hasChanges = JSON.stringify(formData) !== JSON.stringify(prevFormData);
+
+  return (
+    <form>
+      {hasChanges && (
+        <div className="alert">You have unsaved changes</div>
+      )}
+      {/* Form fields */}
+    </form>
+  );
+}
+```
+
+### Implementation Details
+
+The hook uses a `ref` to store the previous value:
+
+```javascript
+import {useEffect, useRef} from 'react';
+
+const usePrevious = (value) => {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+```
+
+Key characteristics:
+- Returns `undefined` on the first render
+- Updates after each render completes
+- Doesn't cause re-renders when updated
+- Safe for any value type (primitives, objects, arrays)
+
+---
+
+## Hook Exports
+
+The hooks are exported from `src/hooks/index.js`:
+
+```javascript
+import {useToggle} from './useToggle';
+
+export {useToggle};
+```
+
+Other hooks are imported directly from their individual files:
+
+```javascript
+import useAdaptiveImage from '../hooks/useAdaptiveImage';
+import usePrevious from '../hooks/usePrevious';
+import useTimeout from '../hooks/useTimeout';
+```
+
+## Related
+
+- [useSanityQuery](/api/use-sanity-query) - Fetch Sanity and Shopify data
+- [useProductsContext](/api/use-products-context) - Access Shopify products in nested components

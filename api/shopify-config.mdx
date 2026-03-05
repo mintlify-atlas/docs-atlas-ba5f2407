@@ -1,0 +1,303 @@
+---
+title: 'shopify.config.js'
+description: 'Configure Shopify Hydrogen integration for your Tune Me In storefront'
+---
+
+## Overview
+
+The `shopify.config.js` file contains the configuration for connecting your Shopify Hydrogen storefront to both Shopify and Sanity CMS. This configuration is passed to the `ShopifyServerProvider` and used throughout the application to fetch products, collections, and content.
+
+## Configuration File
+
+Location: `shopify.config.js` (project root)
+
+```javascript
+import sanityConfig from './sanity.config';
+
+export default {
+  graphqlApiVersion: 'unstable',
+  locale: 'en-us',
+  storeDomain: 'sanity-dev-store.myshopify.com',
+  storefrontToken: '791dbd01268e4a7129288e24b1012710',
+  sanity: sanityConfig,
+};
+```
+
+## Configuration Options
+
+<ParamField path="storeDomain" type="string" required>
+  Your Shopify store domain. This is the myshopify.com domain for your store.
+  
+  **Example:** `'sanity-dev-store.myshopify.com'`
+  
+  **Format:** `your-store-name.myshopify.com`
+  
+  **How to find:** Available in your Shopify admin under Settings > Domains
+</ParamField>
+
+<ParamField path="storefrontToken" type="string" required>
+  Your Shopify Storefront API access token. This token allows your Hydrogen app to access your store's data via the Storefront API.
+  
+  **Example:** `'791dbd01268e4a7129288e24b1012710'`
+  
+  **How to create:**
+  1. Go to Shopify Admin > Apps > Develop apps
+  2. Create a new app or select an existing one
+  3. Configure Storefront API scopes
+  4. Generate and copy the Storefront API access token
+  
+  **Security:** While this token is meant for client-side use, consider using environment variables for better security practices.
+</ParamField>
+
+<ParamField path="locale" type="string" default="en-us">
+  The locale/language code for your storefront. This affects language-specific content, currency formatting, and date formatting.
+  
+  **Example:** `'en-us'`
+  
+  **Common values:**
+  - `'en-us'` - English (United States)
+  - `'en-gb'` - English (United Kingdom)
+  - `'fr-fr'` - French (France)
+  - `'de-de'` - German (Germany)
+  - `'ja-jp'` - Japanese (Japan)
+  
+  **Format:** ISO 639-1 language code followed by ISO 3166-1 country code (lowercase, hyphen-separated)
+</ParamField>
+
+<ParamField path="graphqlApiVersion" type="string" default="unstable">
+  The Shopify Storefront API version to use. This determines which API features and behavior your application uses.
+  
+  **Example:** `'unstable'`
+  
+  **Common values:**
+  - `'unstable'` - Latest features, may change
+  - `'2024-01'` - January 2024 stable version
+  - `'2023-10'` - October 2023 stable version
+  - `'2023-07'` - July 2023 stable version
+  
+  **Recommendation:** Use `'unstable'` during development, but switch to a stable version for production. Shopify releases new API versions quarterly.
+  
+  **Version support:** Each API version is supported for at least 12 months after release.
+</ParamField>
+
+<ParamField path="sanity" type="object" required>
+  The Sanity CMS configuration object imported from `sanity.config.js`. This integrates content management capabilities into your Shopify storefront.
+  
+  **Type:** Sanity configuration object
+  
+  **Properties:**
+  - `projectId` - Sanity project ID
+  - `dataset` - Sanity dataset name
+  - `apiVersion` - Sanity API version
+  - `useCdn` - Whether to use Sanity CDN
+  
+  See [sanity.config.js](/api/sanity-config) for detailed documentation.
+</ParamField>
+
+## Usage in Application
+
+The Shopify configuration is used to initialize the Hydrogen framework:
+
+### Server Provider
+
+In `src/App.server.jsx`:
+
+```javascript
+import {ShopifyServerProvider} from '@shopify/hydrogen';
+import shopifyConfig from '../shopify.config';
+
+export default function App({...serverState}) {
+  return (
+    <ShopifyServerProvider shopifyConfig={shopifyConfig} {...serverState}>
+      {/* App components */}
+    </ShopifyServerProvider>
+  );
+}
+```
+
+### Client Entry
+
+In `src/entry-client.jsx`:
+
+```javascript
+import shopifyConfig from '../shopify.config';
+// Configuration is available for client-side operations
+```
+
+### Vite Configuration
+
+In `vite.config.js`:
+
+```javascript
+import shopifyConfig from './shopify.config';
+// Used for build-time configuration
+```
+
+## Environment-Specific Configuration
+
+For different environments, use environment variables:
+
+```javascript
+import sanityConfig from './sanity.config';
+
+const isProd = process.env.NODE_ENV === 'production';
+
+export default {
+  graphqlApiVersion: isProd ? '2024-01' : 'unstable',
+  locale: process.env.SHOPIFY_LOCALE || 'en-us',
+  storeDomain: process.env.SHOPIFY_STORE_DOMAIN || 'sanity-dev-store.myshopify.com',
+  storefrontToken: process.env.SHOPIFY_STOREFRONT_TOKEN || 'your-dev-token',
+  sanity: sanityConfig,
+};
+```
+
+### Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash
+# Shopify Configuration
+SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+SHOPIFY_STOREFRONT_TOKEN=your-storefront-api-token
+SHOPIFY_LOCALE=en-us
+
+# For production, use a stable API version
+SHOPIFY_API_VERSION=2024-01
+```
+
+## Multi-Language Setup
+
+For multi-language storefronts:
+
+```javascript
+import sanityConfig from './sanity.config';
+
+const locales = {
+  'en-us': {
+    locale: 'en-us',
+    currency: 'USD',
+  },
+  'fr-fr': {
+    locale: 'fr-fr',
+    currency: 'EUR',
+  },
+  'de-de': {
+    locale: 'de-de',
+    currency: 'EUR',
+  },
+};
+
+const currentLocale = process.env.SHOPIFY_LOCALE || 'en-us';
+
+export default {
+  graphqlApiVersion: '2024-01',
+  ...locales[currentLocale],
+  storeDomain: process.env.SHOPIFY_STORE_DOMAIN,
+  storefrontToken: process.env.SHOPIFY_STOREFRONT_TOKEN,
+  sanity: sanityConfig,
+};
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Environment Variables">
+    Store sensitive configuration like `storefrontToken` in environment variables:
+    - Prevents accidental exposure in version control
+    - Allows different values per environment
+    - Improves security posture
+  </Accordion>
+  
+  <Accordion title="Use Stable API Versions in Production">
+    While `'unstable'` provides the latest features, use a stable version in production:
+    - Prevents unexpected breaking changes
+    - Ensures consistent behavior
+    - Gives you control over when to upgrade
+  </Accordion>
+  
+  <Accordion title="Monitor API Version Deprecation">
+    Shopify API versions are supported for 12 months:
+    - Subscribe to Shopify developer newsletters
+    - Plan upgrades before deprecation
+    - Test new versions in staging first
+  </Accordion>
+  
+  <Accordion title="Validate Store Domain Format">
+    Ensure your `storeDomain` is in the correct format:
+    - Must be `*.myshopify.com` domain
+    - Do not include `https://` protocol
+    - Do not include trailing slashes
+  </Accordion>
+</AccordionGroup>
+
+## API Version Migration
+
+When upgrading to a new Shopify API version:
+
+1. **Review the changelog** at [Shopify API Release Notes](https://shopify.dev/api/release-notes)
+2. **Test in development** with the new version
+3. **Update GraphQL queries** for any breaking changes
+4. **Deploy to staging** for integration testing
+5. **Update production** once validated
+
+```javascript
+// Before
+export default {
+  graphqlApiVersion: '2023-07',
+  // ...
+};
+
+// After
+export default {
+  graphqlApiVersion: '2024-01',
+  // ...
+};
+```
+
+## Related Configuration
+
+- [sanity.config.js](/api/sanity-config) - Sanity CMS configuration
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Products Not Loading">
+    **Symptoms:** Empty product lists, GraphQL errors
+    
+    **Solutions:**
+    - Verify `storeDomain` format (should be `*.myshopify.com`)
+    - Check that `storefrontToken` is valid and not revoked
+    - Ensure Storefront API is enabled in your Shopify app settings
+    - Verify API scopes include necessary permissions
+  </Accordion>
+  
+  <Accordion title="GraphQL Version Errors">
+    **Symptoms:** API errors about unsupported fields or types
+    
+    **Solutions:**
+    - Check that `graphqlApiVersion` is a valid version
+    - Review deprecations for your current version
+    - Update queries to match the API version schema
+    - Use Shopify's GraphiQL explorer to test queries
+  </Accordion>
+  
+  <Accordion title="Locale/Currency Issues">
+    **Symptoms:** Wrong currency symbols, incorrect number formatting
+    
+    **Solutions:**
+    - Verify `locale` format is `language-country` (lowercase)
+    - Ensure your Shopify store supports the specified locale
+    - Check that markets are configured in Shopify admin
+    - Confirm currency settings in Shopify match your locale
+  </Accordion>
+  
+  <Accordion title="Authentication Errors">
+    **Symptoms:** 401 or 403 errors when fetching data
+    
+    **Solutions:**
+    - Regenerate `storefrontToken` in Shopify admin
+    - Verify the token has correct Storefront API scopes
+    - Check that the token hasn't been revoked
+    - Ensure the app is installed on the store
+  </Accordion>
+</AccordionGroup>

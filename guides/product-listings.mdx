@@ -1,0 +1,559 @@
+---
+title: 'Product Listings'
+description: 'Creating product listing pages (PLPs) and product detail pages (PDPs)'
+---
+
+# Product Listings
+
+Tune Me In provides a complete setup for displaying products in collection listings (PLPs) and individual product detail pages (PDPs).
+
+## Product Card Component
+
+The `ProductCard` component displays a product in a grid layout:
+
+```jsx src/components/ProductCard.server.jsx
+import {Product} from '@shopify/hydrogen/client';
+import {encode} from '../utils/shopifyGid';
+import ButtonSelectedVariantAddToCart from './ButtonSelectedVariantAddToCart.client';
+import LinkProduct from './LinkProduct.client';
+
+const ProductCard = (props) => {
+  const {product} = props;
+
+  if (!product.storefront) {
+    return null;
+  }
+
+  const encodedVariantId = encode('ProductVariant', product?.variantId);
+
+  return (
+    <Product product={product.storefront} initialVariantId={encodedVariantId}>
+      <div className="bg-white col-span-2 group">
+        {/* Image */}
+        <div className="overflow-hidden relative">
+          <div className="aspect-w-6 aspect-h-4 bg-gray-100">
+            <LinkProduct handle={product?.slug} variantId={product?.variantId}>
+              <Product.SelectedVariant.Image
+                className="absolute h-full object-cover w-full"
+                options={{width: 800}}
+              />
+            </LinkProduct>
+          </div>
+          
+          {/* Quick add to cart button */}
+          <div className="absolute bottom-0 left-0 w-full transform-gpu transition-transform translate-y-full group-hover:translate-y-0 duration-300">
+            <ButtonSelectedVariantAddToCart />
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="font-medium mt-2">
+          <LinkProduct handle={product?.slug} variantId={product?.variantId}>
+            <Product.Title />
+          </LinkProduct>
+        </div>
+        
+        {/* Price */}
+        <div className="flex items-center">
+          <Product.SelectedVariant.Price className="text-gray-900" />
+          <Product.SelectedVariant.Price
+            priceType="compareAt"
+            className="ml-1 text-gray-400 line-through"
+          />
+        </div>
+      </div>
+    </Product>
+  );
+};
+
+export default ProductCard;
+```
+
+### Key Features
+
+- **Hover effect** - Shows "Add to Cart" button on hover
+- **Clickable image and title** - Links to product detail page
+- **Price display** - Shows current price and compare-at price (if on sale)
+- **Variant support** - Displays the selected variant's image and price
+
+## Product Listing Grid
+
+The `ProductListing` component displays products in a responsive grid:
+
+```jsx src/components/ProductListing.server.jsx
+import clsx from 'clsx';
+import ProductCard from './ProductCard.server';
+
+export default function ProductListing({products}) {
+  return (
+    <section
+      className={clsx([
+        'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+        'gap-10 my-8',
+      ])}
+    >
+      {(!products || products.length === 0) && <div>No products</div>}
+
+      {products?.map((product) => (
+        <div key={product?._id}>
+          <ProductCard product={product} />
+        </div>
+      ))}
+    </section>
+  );
+}
+```
+
+## Collection Page (PLP)
+
+Collection pages display filtered product listings with pagination:
+
+```jsx src/pages/collections/[handle].server.jsx
+import groq from 'groq';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import {useParams} from 'react-router-dom';
+
+import Layout from '../../components/Layout.server';
+import NotFound from '../../components/NotFound.server';
+import ProductCard from '../../components/ProductCard.server';
+import CollectionHeader from '../../components/CollectionHeader.server';
+import CollectionPagination from '../../components/CollectionPagination.client';
+import Seo from '../../components/Seo.client';
+
+export default function Collection({currentPage}) {
+  const pageSize = 6;
+  const page = currentPage || 0;
+  const start = page * pageSize;
+  const end = start + (pageSize - 1);
+
+  const {handle} = useParams();
+  const {sanityData: sanityCollection, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+    params: {
+      slug: handle,
+      start,
+      end,
+    },
+    getProductGraphQLFragment: () => {
+      return `
+        ...ProductProviderFragment
+        images(first: 10) {
+          edges {
+            node {
+              altText
+              url
+            }
+          }
+        }
+      `;
+    },
+  });
+
+  if (!sanityCollection) {
+    return <NotFound />;
+  }
+
+  const totalItems = sanityCollection.totalProducts;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  return (
+    <Layout>
+      <div className="w-full">
+        <CollectionHeader
+          image={sanityCollection.image}
+          title={sanityCollection.title}
+        />
+        
+        <div className="mb-4">
+          <CollectionPagination totalPages={totalPages} currentPage={page} />
+        </div>
+        
+        <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {sanityCollection.products.map((sanityProduct) => (
+            <ProductCard
+              key={sanityProduct._id}
+              product={{
+                ...sanityProduct,
+                storefront: shopifyProducts?.[sanityProduct?._id],
+              }}
+              mode="small-interactive"
+              addToCart
+              detailsLink
+            />
+          ))}
+        </div>
+        
+        <div className="mb-4">
+          <CollectionPagination totalPages={totalPages} currentPage={page} />
+        </div>
+      </div>
+      
+      <Seo
+        page={{
+          description: sanityCollection.seo?.description,
+          title: `TMI | ${sanityCollection.title}`,
+        }}
+      />
+    </Layout>
+  );
+}
+
+const QUERY = groq`
+  *[
+    _type == 'collection'
+    && slug.current == $slug
+  ][0]{
+    title,
+    image,
+    "totalProducts": count(products[available]),
+    products[available][$start..$end]
+  }
+`;
+```
+
+### PLP Features
+
+- **Pagination** - Split products into pages for better performance
+- **Collection header** - Hero image and title
+- **Responsive grid** - 1 column on mobile, 3 on desktop
+- **SEO optimization** - Proper meta tags for search engines
+
+## Product Detail Page (PDP)
+
+The product detail page shows full product information:
+
+```jsx src/pages/products/[handle].server.jsx
+import {flattenConnection} from '@shopify/hydrogen';
+import groq from 'groq';
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import {useParams} from 'react-router-dom';
+import {ProductProvider} from '@shopify/hydrogen/client';
+
+import Layout from '../../components/Layout.server';
+import NotFound from '../../components/NotFound.server';
+import ProductDetails from '../../components/ProductDetails.client';
+import FeaturedCollection from '../../components/FeaturedCollection.server';
+import Seo from '../../components/Seo.client';
+import ProductsProvider from '../../contexts/ProductsProvider.client';
+import {PRODUCT_PAGE} from '../../fragments/productPage';
+import {encode} from '../../utils/shopifyGid';
+
+export default function Product(props) {
+  const {handle} = useParams();
+  const {sanityData: sanityProduct, shopifyProducts} = useSanityQuery({
+    query: QUERY,
+    params: {
+      slug: handle,
+    },
+    getProductGraphQLFragment: () => {
+      return `
+        ...ProductProviderFragment
+        mf:metafields(namespace:"tunemein", first:2){
+          edges {
+            node {
+              key
+              value
+            }
+          }
+        }
+        images(first: 10) {
+          edges {
+            node {
+              altText
+              url
+            }
+          }
+        }
+      `;
+    },
+  });
+
+  const storefrontProduct = shopifyProducts?.[sanityProduct?._id];
+
+  if (!sanityProduct || !storefrontProduct) {
+    return <NotFound />;
+  }
+
+  const product = {
+    ...sanityProduct,
+    storefront: storefrontProduct,
+  };
+
+  // Handle variant selection from URL params
+  const params = new URLSearchParams(props.search);
+  const variantId = props?.variantId || params?.get('variant');
+  const encodedVariantId = encode('ProductVariant', variantId);
+
+  const flattenedVariants = flattenConnection(product.storefront.variants);
+  const productVariantIndex = flattenedVariants.findIndex(
+    (variant) => variant.id === encodedVariantId,
+  );
+
+  const productVariant =
+    product.storefront?.variants?.edges[
+      productVariantIndex >= 0 ? productVariantIndex : 0
+    ];
+
+  const {relatedCollection} = sanityProduct;
+
+  return (
+    <ProductsProvider value={shopifyProducts}>
+      <Layout>
+        <ProductProvider
+          product={product?.storefront}
+          initialVariantId={productVariant?.node?.id}
+        >
+          <ProductDetails product={product} />
+        </ProductProvider>
+
+        {relatedCollection && (
+          <FeaturedCollection
+            title={relatedCollection.title}
+            products={relatedCollection.products.map((prod) => ({
+              ...prod.productData,
+              storefront: shopifyProducts?.[prod?.productData._id],
+            }))}
+          />
+        )}
+
+        <Seo
+          page={{
+            description: sanityProduct.seo?.description,
+            image: sanityProduct.seo?.image,
+            product: {
+              availableForSale: productVariant?.node?.availableForSale,
+              description: sanityProduct.seo?.description,
+              price: productVariant?.node?.priceV2,
+              title: sanityProduct.seo?.title || sanityProduct?.store?.title,
+            },
+            title: `TMI | ${sanityProduct.seo?.title || sanityProduct?.store?.title}`,
+            type: 'product',
+          }}
+        />
+      </Layout>
+    </ProductsProvider>
+  );
+}
+
+const QUERY = groq`
+  *[
+    _type == 'product'
+    && store.slug.current == $slug
+  ][0]{
+    ${PRODUCT_PAGE}
+  }
+`;
+```
+
+## Product Details Component
+
+The `ProductDetails` component displays the full product information:
+
+```jsx src/components/ProductDetails.client.jsx
+import {Disclosure} from '@headlessui/react';
+import {ChevronUpIcon} from '@heroicons/react/outline';
+import {Product} from '@shopify/hydrogen/client';
+
+import ButtonSelectedVariantAddToCart from './ButtonSelectedVariantAddToCart.client';
+import ButtonSelectedVariantBuyNow from './ButtonSelectedVariantBuyNow.client';
+import PortableText from './PortableText.client';
+import ProductGallery from './ProductGallery.client';
+import ProductOptions from './ProductOptions.client';
+
+export default function ProductDetails({product}) {
+  return (
+    <div className="p-4">
+      <Product product={product.storefront}>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-12">
+          {/* Gallery section */}
+          <section className="lg:col-span-2 grid gap-5" aria-label="Gallery">
+            <div className="aspect-w-4 aspect-h-3 bg-gray-50 w-full">
+              <Product.SelectedVariant.Image
+                className="object-cover"
+                options={{width: 2000}}
+              />
+            </div>
+
+            {product?.images && (
+              <div className="mb-10">
+                <ProductGallery images={product.images} />
+              </div>
+            )}
+
+            {product?.body && (
+              <div className="max-w-2xl">
+                <PortableText blocks={product.body} />
+              </div>
+            )}
+          </section>
+
+          {/* Product info section */}
+          <section
+            className="my-4 md:my-0 max-w-md flex flex-col gap-6"
+            aria-label="Product details"
+          >
+            <div>
+              <Product.Title className="text-gray-900 font-medium" />
+              
+              <div className="gap-1">
+                <Product.SelectedVariant.Price className="font-medium text-gray-900">
+                  {({currencyCode, amount, currencyNarrowSymbol}) => (
+                    <span>{`${currencyCode} ${currencyNarrowSymbol}${amount}`}</span>
+                  )}
+                </Product.SelectedVariant.Price>
+                
+                <Product.SelectedVariant.Price
+                  priceType="compareAt"
+                  className="text-gray-400 line-through"
+                >
+                  {({amount, currencyNarrowSymbol}) => (
+                    <span>{`${currencyNarrowSymbol}${amount}`}</span>
+                  )}
+                </Product.SelectedVariant.Price>
+              </div>
+
+              {/* Product options (size, color, etc.) */}
+              <div className="mt-5">
+                <ProductOptions />
+              </div>
+
+              {/* Action buttons */}
+              <div className="my-8 space-y-2">
+                <ButtonSelectedVariantAddToCart />
+                <ButtonSelectedVariantBuyNow showSoldOut={false} />
+              </div>
+
+              {/* Collapsible sections */}
+              <div className="my-4">
+                {product?.sections?.map((section) => (
+                  <Disclosure key={section?._key}>
+                    {({open}) => (
+                      <>
+                        <Disclosure.Button className="border-b border-gray-400 flex font-medium items-center justify-between text-md py-2 w-full">
+                          <span>{section?.title}</span>
+                          <ChevronUpIcon
+                            className={`${
+                              open ? 'transform rotate-180' : ''
+                            } w-5 h-5 text-black`}
+                          />
+                        </Disclosure.Button>
+                        <Disclosure.Panel className="mt-2 text-gray-600 text-sm">
+                          {section?.body && (
+                            <PortableText blocks={section.body} />
+                          )}
+                        </Disclosure.Panel>
+                      </>
+                    )}
+                  </Disclosure>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      </Product>
+    </div>
+  );
+}
+```
+
+### PDP Features
+
+- **Product gallery** - Multiple images with thumbnails
+- **Variant selection** - Size, color, and other options
+- **Price display** - Current price and sale price
+- **Add to cart** - Direct add to cart functionality
+- **Buy now** - Instant checkout
+- **Rich content** - Portable Text for product descriptions
+- **Collapsible sections** - Additional info like shipping, returns
+- **Related products** - Show related items below
+
+## Product Options
+
+Handle product variants with the `ProductOptions` component:
+
+```jsx src/components/ProductOptions.client.jsx
+import {Product} from '@shopify/hydrogen/client';
+
+export default function ProductOptions() {
+  return (
+    <Product.OptionProvider>
+      {({options}) => (
+        <>
+          {options.map(({name, values}) => (
+            <fieldset key={name} className="mb-4">
+              <legend className="font-medium mb-2">{name}</legend>
+              <div className="flex flex-wrap gap-2">
+                {values.map((value) => (
+                  <Product.OptionProvider.Option
+                    key={value}
+                    name={name}
+                    value={value}
+                  >
+                    {({isActive, isAvailable}) => (
+                      <button
+                        className={`
+                          px-4 py-2 border rounded
+                          ${isActive ? 'border-black bg-black text-white' : 'border-gray-300'}
+                          ${!isAvailable ? 'opacity-50 cursor-not-allowed' : 'hover:border-black'}
+                        `}
+                        disabled={!isAvailable}
+                      >
+                        {value}
+                      </button>
+                    )}
+                  </Product.OptionProvider.Option>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </>
+      )}
+    </Product.OptionProvider>
+  );
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Optimize images">
+    Use appropriate image sizes with Hydrogen's image optimization:
+    
+    ```jsx
+    <Product.SelectedVariant.Image
+      options={{width: 800, height: 1000, crop: 'center'}}
+    />
+    ```
+  </Accordion>
+  
+  <Accordion title="Handle out-of-stock products">
+    Always check variant availability and show appropriate UI:
+    
+    ```jsx
+    <Product.SelectedVariant.AddToCartButton
+      disabled={!variant.availableForSale}
+    >
+      {variant.availableForSale ? 'Add to Cart' : 'Sold Out'}
+    </Product.SelectedVariant.AddToCartButton>
+    ```
+  </Accordion>
+  
+  <Accordion title="Implement proper pagination">
+    For large collections, use pagination to improve performance and UX.
+  </Accordion>
+  
+  <Accordion title="Add structured data for SEO">
+    Include product schema markup for better search engine visibility.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Portable Text" icon="text" href="/guides/portable-text">
+    Add rich editorial content to product descriptions
+  </Card>
+  <Card title="Styling" icon="palette" href="/guides/styling">
+    Customize the look and feel of your product pages
+  </Card>
+</CardGroup>

@@ -1,0 +1,512 @@
+---
+title: Installation
+description: Detailed installation instructions for Tune Me In, including prerequisites, dependencies, and configuration.
+---
+
+This guide provides comprehensive installation instructions for Tune Me In, including all prerequisites, dependencies, and configuration options.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Required:** Node.js 14.0 or higher
+    
+    Check your version:
+    ```bash
+    node --version
+    ```
+  </Card>
+  
+  <Card title="Package Manager" icon="box">
+    **Required:** npm, yarn, or pnpm
+    
+    Comes with Node.js or install separately
+  </Card>
+  
+  <Card title="Shopify Store" icon="shopify">
+    **Optional:** For custom data
+    
+    Need a Shopify store with Storefront API access
+  </Card>
+  
+  <Card title="Sanity Account" icon="database">
+    **Optional:** For custom data
+    
+    Need a Sanity project with Shopify Studio
+  </Card>
+</CardGroup>
+
+<Note>
+  You can get started immediately with demo data - connecting your own Shopify store and Sanity project is optional.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the Tune Me In starter from GitHub:
+    
+    <CodeGroup>
+      ```bash SSH
+      git clone git@github.com:sanity-io/hydrogen-sanity-demo.git tune-me-in
+      cd tune-me-in
+      ```
+
+      ```bash HTTPS
+      git clone https://github.com/sanity-io/hydrogen-sanity-demo.git tune-me-in
+      cd tune-me-in
+      ```
+    </CodeGroup>
+    
+    This creates a new directory called `tune-me-in` with the starter code.
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required packages using your preferred package manager:
+    
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+    
+    This installs all dependencies defined in `package.json`, including:
+  </Step>
+</Steps>
+
+## Core Dependencies
+
+Tune Me In includes these key dependencies:
+
+### Hydrogen & Shopify
+
+```json package.json
+{
+  "dependencies": {
+    "@shopify/hydrogen": "0.7.0"
+  }
+}
+```
+
+The Shopify Hydrogen framework provides:
+- Server-side rendering with React 18
+- Streaming SSR for fast page loads
+- Built-in commerce components
+- Storefront API integration
+
+### Sanity Integration
+
+```json package.json
+{
+  "dependencies": {
+    "@sanity/client": "^2.21.7",
+    "@sanity/image-url": "^1.0.1",
+    "@sanity/block-content-to-react": "^3.0.0",
+    "hydrogen-plugin-sanity": "^0.1.1",
+    "groq": "^2.15.0"
+  }
+}
+```
+
+These packages provide:
+- `@sanity/client` - JavaScript client for querying Sanity
+- `@sanity/image-url` - Image URL builder for Sanity images
+- `@sanity/block-content-to-react` - Renders Portable Text content
+- `hydrogen-plugin-sanity` - Unified Sanity + Shopify data fetching
+- `groq` - Query language for Sanity
+
+### UI & Styling
+
+```json package.json
+{
+  "dependencies": {
+    "@headlessui/react": "^1.4.1",
+    "@heroicons/react": "^1.0.5",
+    "@tailwindcss/aspect-ratio": "^0.3.0",
+    "clsx": "^1.1.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^2.2.4",
+    "@tailwindcss/typography": "^0.4.1",
+    "autoprefixer": "^10.2.5",
+    "postcss": "^8.2.10"
+  }
+}
+```
+
+### Build Tools
+
+```json package.json
+{
+  "devDependencies": {
+    "vite": "^2.6.14",
+    "cross-env": "^7.0.3"
+  }
+}
+```
+
+## Configuration
+
+<Tabs>
+  <Tab title="Using Demo Data">
+    ### Run with Demo Data
+    
+    The starter comes pre-configured with demo data. You can start developing immediately:
+    
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
+    
+    Visit `http://localhost:3000` to see the storefront with demo products.
+    
+    <Info>
+      The demo configuration points to:
+      - **Shopify Store:** `sanity-dev-store.myshopify.com`
+      - **Sanity Project:** `wfr1r0dw` (dataset: `production`)
+    </Info>
+  </Tab>
+  
+  <Tab title="Using Your Own Data">
+    ### Configure Your Own Store
+    
+    To use your own Shopify store and Sanity project, update both configuration files.
+    
+    <Steps>
+      <Step title="Get Shopify Credentials">
+        1. Log in to your Shopify admin
+        2. Go to **Settings** → **Apps and sales channels**
+        3. Create a custom app or use an existing one
+        4. Enable **Storefront API** access
+        5. Copy your **Storefront Access Token** and **Store Domain**
+      </Step>
+      
+      <Step title="Update shopify.config.js">
+        Edit `shopify.config.js` at the root of your project:
+        
+        ```javascript shopify.config.js
+        import sanityConfig from './sanity.config';
+
+        export default {
+          graphqlApiVersion: 'unstable',
+          locale: 'en-us',
+          storeDomain: 'your-store.myshopify.com', // Your store domain
+          storefrontToken: 'your-storefront-access-token', // Your token
+          sanity: sanityConfig,
+        };
+        ```
+        
+        <Warning>
+          Keep your `storefrontToken` secure. Consider using environment variables for production:
+          ```javascript
+          storefrontToken: import.meta.env.VITE_SHOPIFY_STOREFRONT_TOKEN
+          ```
+        </Warning>
+      </Step>
+      
+      <Step title="Get Sanity Credentials">
+        1. Log in to your [Sanity account](https://www.sanity.io/manage)
+        2. Find or create a project
+        3. Note your **Project ID** (visible in project settings)
+        4. Choose your **Dataset** name (usually `production`)
+      </Step>
+      
+      <Step title="Update sanity.config.js">
+        Edit `sanity.config.js` at the root of your project:
+        
+        ```javascript sanity.config.js
+        export default {
+          apiVersion: 'v2021-06-07',
+          dataset: 'production', // Your dataset name
+          projectId: 'your-project-id', // Your Sanity project ID
+          useCdn: true, // Use CDN for faster queries
+        };
+        ```
+        
+        <Tip>
+          Set `useCdn: false` during development if you want to see content changes immediately without CDN caching.
+        </Tip>
+      </Step>
+      
+      <Step title="Set Up Sanity Connect">
+        To sync your Shopify products to Sanity, install Sanity Connect:
+        
+        1. Install the [Sanity Shopify Studio](https://github.com/sanity-io/sanity-shopify-studio)
+        2. Configure [Sanity Connect for Shopify](https://www.sanity.io/docs/sanity-connect-for-shopify)
+        3. Run an initial sync to import your products
+        
+        <Info>
+          Sanity Connect automatically syncs your products, keeping your Sanity dataset up to date with Shopify changes.
+        </Info>
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Verify Installation
+
+After installation and configuration, verify everything is working:
+
+<Steps>
+  <Step title="Start the Development Server">
+    <CodeGroup>
+      ```bash npm
+      npm run dev
+      ```
+
+      ```bash yarn
+      yarn dev
+      ```
+
+      ```bash pnpm
+      pnpm dev
+      ```
+    </CodeGroup>
+    
+    You should see output like:
+    ```
+    Hydrogen server started on http://localhost:3000
+    ```
+  </Step>
+  
+  <Step title="Open the Storefront">
+    Navigate to `http://localhost:3000` in your browser.
+    
+    You should see:
+    - Home page with featured products
+    - Navigation with collections
+    - Working product links
+  </Step>
+  
+  <Step title="Test Key Pages">
+    Verify these routes work:
+    - `/` - Home page
+    - `/collections/all` - All products
+    - `/products/[any-product-handle]` - Product detail page
+    - `/about` - Editorial page example
+  </Step>
+</Steps>
+
+## Available Scripts
+
+Tune Me In includes these npm scripts:
+
+<CodeGroup>
+  ```json Development
+  {
+    "scripts": {
+      "dev": "vite"
+    }
+  }
+  ```
+
+  ```json Build
+  {
+    "scripts": {
+      "build": "yarn build:client && yarn build:server && yarn build:worker",
+      "build:client": "vite build --outDir dist/client --manifest",
+      "build:server": "vite build --outDir dist/server --ssr src/entry-server.jsx",
+      "build:worker": "cross-env WORKER=true vite build --outDir dist/worker --ssr worker.js"
+    }
+  }
+  ```
+
+  ```json Linting
+  {
+    "scripts": {
+      "lint": "npm-run-all lint:*",
+      "lint:js": "eslint --no-error-on-unmatched-pattern --ext .js,.ts,.jsx,.tsx src",
+      "lint:css": "stylelint ./src/**/*.{css,sass,scss}"
+    }
+  }
+  ```
+
+  ```json Production Server
+  {
+    "scripts": {
+      "serve": "node --enable-source-maps server"
+    }
+  }
+  ```
+</CodeGroup>
+
+### Script Usage
+
+<CodeGroup>
+  ```bash npm
+  npm run dev      # Start development server
+  npm run build    # Build for production
+  npm run lint     # Run linters
+  npm run serve    # Serve production build
+  ```
+
+  ```bash yarn
+  yarn dev         # Start development server
+  yarn build       # Build for production
+  yarn lint        # Run linters
+  yarn serve       # Serve production build
+  ```
+
+  ```bash pnpm
+  pnpm dev         # Start development server
+  pnpm build       # Build for production
+  pnpm lint        # Run linters
+  pnpm serve       # Serve production build
+  ```
+</CodeGroup>
+
+## Environment Variables (Optional)
+
+For better security in production, use environment variables:
+
+<Steps>
+  <Step title="Create .env File">
+    Create a `.env` file at the root of your project:
+    
+    ```bash .env
+    VITE_SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+    VITE_SHOPIFY_STOREFRONT_TOKEN=your-token
+    VITE_SANITY_PROJECT_ID=your-project-id
+    VITE_SANITY_DATASET=production
+    ```
+  </Step>
+  
+  <Step title="Update Configuration Files">
+    Reference environment variables in your config:
+    
+    ```javascript shopify.config.js
+    export default {
+      storeDomain: import.meta.env.VITE_SHOPIFY_STORE_DOMAIN || 'sanity-dev-store.myshopify.com',
+      storefrontToken: import.meta.env.VITE_SHOPIFY_STOREFRONT_TOKEN || 'default-token',
+      // ...
+    };
+    ```
+    
+    ```javascript sanity.config.js
+    export default {
+      projectId: import.meta.env.VITE_SANITY_PROJECT_ID || 'wfr1r0dw',
+      dataset: import.meta.env.VITE_SANITY_DATASET || 'production',
+      // ...
+    };
+    ```
+  </Step>
+  
+  <Step title="Add to .gitignore">
+    Make sure `.env` is in your `.gitignore`:
+    
+    ```bash .gitignore
+    .env
+    .env.local
+    .env.production
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Never commit sensitive credentials to version control. Always use environment variables for production deployments.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Node version error">
+    Tune Me In requires Node.js 14.0 or higher. Update Node.js:
+    
+    ```bash
+    # Using nvm
+    nvm install 14
+    nvm use 14
+    
+    # Or download from nodejs.org
+    ```
+  </Accordion>
+  
+  <Accordion title="Installation fails">
+    Try these steps:
+    
+    1. Clear npm cache:
+       ```bash
+       npm cache clean --force
+       ```
+    
+    2. Delete node_modules and lock file:
+       ```bash
+       rm -rf node_modules package-lock.json
+       npm install
+       ```
+    
+    3. Use a different package manager (try yarn or pnpm)
+  </Accordion>
+  
+  <Accordion title="Shopify connection error">
+    Verify your Shopify credentials:
+    
+    - Store domain should be in format: `your-store.myshopify.com`
+    - Storefront token must have Storefront API access enabled
+    - Check token hasn't expired
+    
+    Test your credentials using the Shopify Storefront API explorer.
+  </Accordion>
+  
+  <Accordion title="Sanity data not loading">
+    Check your Sanity configuration:
+    
+    - Project ID is correct (visible in project settings)
+    - Dataset exists and has data
+    - Products are synced from Shopify using Sanity Connect
+    - API permissions allow read access
+    
+    Test your connection:
+    ```bash
+    npx @sanity/cli dataset list --project=your-project-id
+    ```
+  </Accordion>
+  
+  <Accordion title="Build errors">
+    Common build issues:
+    
+    - Ensure all dependencies are installed: `npm install`
+    - Check Node.js version: `node --version`
+    - Clear Vite cache: `rm -rf node_modules/.vite`
+    - Update dependencies: `npm update`
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that Tune Me In is installed, you're ready to start building:
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn how the codebase is organized
+  </Card>
+  
+  <Card title="Data Fetching" icon="database" href="/concepts/data-fetching">
+    Understand how to query Sanity and Shopify data
+  </Card>
+  
+  <Card title="Components" icon="puzzle-piece" href="/guides/components">
+    Explore available components and create your own
+  </Card>
+  
+  <Card title="Deployment" icon="rocket" href="/deployment/overview">
+    Deploy your storefront to production
+  </Card>
+</CardGroup>

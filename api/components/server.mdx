@@ -1,0 +1,218 @@
+---
+title: "Server Components"
+description: "React Server Components for rendering on the server"
+---
+
+Server components in Tune Me In handle server-side rendering and data fetching. They have access to server-side data and can make Sanity CMS queries.
+
+## Layout
+
+The root layout component that wraps all pages.
+
+<ParamField path="children" type="ReactNode" required>
+  Page content to be rendered within the layout
+</ParamField>
+
+### Features
+- Wraps content with Hydrogen's `LocalizationProvider`
+- Includes `HeaderScroll`, `Cart`, and `Footer` components
+- Sets up main content area with minimum height and responsive container
+
+### Usage Example
+
+```jsx
+import Layout from './components/Layout.server';
+
+export default function MyPage() {
+  return (
+    <Layout>
+      <div>Page content here</div>
+    </Layout>
+  );
+}
+```
+
+**Source:** `src/components/Layout.server.jsx:7`
+
+---
+
+## Header
+
+The site header with navigation and cart toggle.
+
+<ParamField path="props" type="object">
+  Props passed through to the HeaderScroll component
+</ParamField>
+
+### Features
+- Logo with link to homepage
+- Static navigation menu (About, T-Shirts, Collections, Lifestyle)
+- Cart toggle button
+- Wrapped in `HeaderScroll` for scroll behavior
+
+### Usage Example
+
+```jsx
+import Header from './components/Header.server';
+
+<Header />
+```
+
+**Source:** `src/components/Header.server.jsx:8`
+
+---
+
+## Footer
+
+The site footer with links and newsletter signup.
+
+### Features
+- Navigation links organized in columns
+- Collection quick links
+- Newsletter subscription form
+- Responsive layout (mobile to desktop)
+
+### Usage Example
+
+```jsx
+import Footer from './components/Footer.server';
+
+<Footer />
+```
+
+**Source:** `src/components/Footer.server.jsx:5`
+
+---
+
+## ProductCard
+
+Displays a product card with image, title, price, and quick-add button.
+
+<ParamField path="product" type="object" required>
+  Product object containing:
+  - `storefront` - Shopify storefront product data
+  - `slug` - Product handle/slug
+  - `variantId` - Selected variant ID (unencoded)
+</ParamField>
+
+### Features
+- Displays selected variant image
+- Shows product title and pricing
+- Quick add to cart button on hover
+- Compares at price display (if available)
+- Links to product detail page
+
+### Usage Example
+
+```jsx
+import ProductCard from './components/ProductCard.server';
+
+<ProductCard product={{
+  storefront: shopifyProduct,
+  slug: 'my-product',
+  variantId: '12345'
+}} />
+```
+
+**Source:** `src/components/ProductCard.server.jsx:7`
+
+---
+
+## ProductListing
+
+Displays a grid of product cards.
+
+<ParamField path="products" type="array" required>
+  Array of product objects to display
+</ParamField>
+
+### Features
+- Responsive grid layout (1-3 columns)
+- Empty state when no products
+- Gap spacing between items
+
+### Usage Example
+
+```jsx
+import ProductListing from './components/ProductListing.server';
+
+<ProductListing products={[
+  { _id: '1', storefront: {...}, slug: 'product-1' },
+  { _id: '2', storefront: {...}, slug: 'product-2' }
+]} />
+```
+
+**Source:** `src/components/ProductListing.server.jsx:4`
+
+---
+
+## Main
+
+Root application component that handles routing.
+
+<ParamField path="pages" type="array" required>
+  Array of page routes for Hydrogen's DefaultRoutes
+</ParamField>
+
+<ParamField path="serverState" type="object" required>
+  Server state object from Hydrogen
+</ParamField>
+
+### Features
+- Sets up React Router switch
+- Includes default SEO component
+- 404 fallback page
+- Hydrogen's DefaultRoutes integration
+
+### Usage Example
+
+```jsx
+import Main from './components/Main.server';
+
+<Main pages={pages} serverState={serverState} />
+```
+
+**Source:** `src/components/Main.server.jsx:13`
+
+---
+
+## DefaultSeo
+
+Server component that fetches and applies default SEO settings from Sanity.
+
+### Features
+- Queries Sanity for global SEO settings
+- Passes default title and image to Seo component
+- No props required
+
+### Usage Example
+
+```jsx
+import DefaultSeo from './components/DefaultSeo.server';
+
+<DefaultSeo />
+```
+
+**Source:** `src/components/DefaultSeo.server.jsx:8`
+
+---
+
+## NotFound
+
+404 error page component.
+
+### Features
+- Wrapped in Layout component
+- User-friendly error message
+- Link back to homepage
+
+### Usage Example
+
+```jsx
+import NotFound from './components/NotFound.server';
+
+// Used as fallback in routing
+<DefaultRoutes fallback={<NotFound />} />
+```
+
+**Source:** `src/components/NotFound.server.jsx:4`

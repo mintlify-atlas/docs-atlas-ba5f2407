@@ -1,0 +1,112 @@
+---
+title: Introduction
+description: Learn about Tune Me In, a powerful Shopify Hydrogen storefront starter with Sanity CMS integration for building custom e-commerce experiences.
+---
+
+Tune Me In is a customized [Shopify Hydrogen](https://shopify.dev/custom-storefronts/hydrogen) starter that demonstrates how Sanity and Structured Content can elevate your custom Shopify storefronts with rich editorial experiences.
+
+<img src="https://user-images.githubusercontent.com/209129/141310942-c7ed2c08-599b-431b-896d-ceadac46012a.png" alt="Tune Me In Storefront" />
+
+## What is Tune Me In?
+
+Tune Me In combines the performance and modern tooling of Shopify Hydrogen with the content flexibility of Sanity CMS. This starter template provides a production-ready foundation for building custom storefronts that go beyond traditional product listing pages (PLPs) and product detail pages (PDPs).
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Unified Data Fetching" icon="database">
+    Query both Sanity and Shopify data in a single call using the `useSanityQuery` hook
+  </Card>
+  
+  <Card title="Rich Editorial Content" icon="pen-to-square">
+    Create engaging content pages using Portable Text with inline product references
+  </Card>
+  
+  <Card title="Customizable Galleries" icon="images">
+    Build dynamic home pages with featured collections and products from your CMS
+  </Card>
+  
+  <Card title="Variant Support" icon="box">
+    Handle product variants with custom URL formatting and state management
+  </Card>
+</CardGroup>
+
+## How It Works
+
+<img width="580" alt="Sanity Hydrogen flow" src="https://user-images.githubusercontent.com/209129/141320691-381776dc-87ff-41ac-ad21-21c817cf8d86.jpg" />
+
+The true power of custom storefronts lies in having the flexibility to augment your products with data relevant to you:
+
+- **Product Enrichment**: Associate products with custom data like ingredients, styling tips, or related content
+- **Editorial Freedom**: Create custom pages that reference multiple products in rich layouts
+- **Structured Content**: Leverage Sanity's Portable Text for flexible, block-based content
+
+### The Sanity + Shopify Approach
+
+Instead of querying Shopify and Sanity separately, Tune Me In uses [Sanity Connect for Shopify](https://www.sanity.io/docs/sanity-connect-for-shopify) to:
+
+1. Sync your Shopify product data to Sanity
+2. Reference products within your Sanity content
+3. Fetch both Sanity content and fresh Shopify data in one query
+4. Ensure you're always displaying the latest product information
+
+<Note>
+  This approach gives you complete control over how products appear in your content while maintaining real-time pricing and inventory accuracy from Shopify.
+</Note>
+
+## What's Included
+
+Tune Me In comes pre-configured with:
+
+- **Home page** with customizable gallery, featured collections and products
+- **Collection PLPs** for browsing products by collection
+- **Product PDPs** with variant support
+- **Editorial pages** supporting inline, block, and margin-level product listings
+- **Custom components** like `<LinkProduct>` for variant URL handling
+- **Pre-built queries** for common e-commerce patterns
+
+## Technology Stack
+
+<AccordionGroup>
+  <Accordion title="Frontend Framework">
+    **Shopify Hydrogen** - React-based framework optimized for commerce, with server-side rendering and streaming.
+  </Accordion>
+  
+  <Accordion title="Content Management">
+    **Sanity CMS** - Structured content platform with real-time collaboration and flexible content modeling.
+  </Accordion>
+  
+  <Accordion title="Build Tool">
+    **Vite** - Fast build tool with hot module replacement for rapid development.
+  </Accordion>
+  
+  <Accordion title="Styling">
+    **Tailwind CSS** - Utility-first CSS framework for rapid UI development.
+  </Accordion>
+</AccordionGroup>
+
+## Designed for Flexibility
+
+This starter is designed to work with [Sanity's pre-configured Shopify Studio](https://github.com/sanity-io/sanity-shopify-studio), which provides:
+
+- Product document schemas
+- Collection schemas
+- Editorial page schemas
+- Home page configuration
+- Image and media management
+
+<Warning>
+  Tune Me In is currently in active development and may not be production-ready for all use cases. We recommend thorough testing before deploying to production.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get your storefront running in minutes
+  </Card>
+  
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Detailed setup and configuration instructions
+  </Card>
+</CardGroup>

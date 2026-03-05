@@ -1,0 +1,417 @@
+---
+title: "PortableText Component"
+description: "Render rich text content from Sanity with custom blocks and annotations"
+---
+
+The `PortableText` component renders rich text content from Sanity CMS, including custom blocks (images, products) and annotations (links, product actions).
+
+## PortableText
+
+Main component for rendering Sanity Portable Text content.
+
+<ParamField path="blocks" type="array" required>
+  Array of Portable Text blocks from Sanity
+</ParamField>
+
+<ParamField path="className" type="string">
+  CSS class to apply to the container
+</ParamField>
+
+### Features
+- Renders rich text with custom serializers
+- Supports custom block types
+- Custom mark/annotation rendering
+- Built on `@sanity/block-content-to-react`
+
+### Usage Example
+
+```jsx
+import PortableText from './components/PortableText.client';
+
+<PortableText 
+  blocks={sanityPortableTextBlocks}
+  className="prose"
+/>
+```
+
+**Source:** `src/components/PortableText.client.jsx:28`
+
+---
+
+## Block Types
+
+Custom block types for special content within Portable Text.
+
+### Block
+
+Standard text block with style support.
+
+<ParamField path="node" type="object" required>
+  Block node from Sanity containing:
+  - `style` - Block style (h2, blockquote, normal)
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Block content
+</ParamField>
+
+#### Supported Styles
+- `h2` - Rendered as heading with text-2xl
+- `blockquote` - Large quote text (text-3xl)
+- `normal` - Standard paragraph (rendered as div)
+
+**Source:** `src/components/blocks/Block.client.jsx:3`
+
+---
+
+### BlockImage
+
+Image block with optional full-width display.
+
+<ParamField path="node" type="object" required>
+  Block node containing:
+  - `fullWidth` (boolean) - Whether image spans full viewport width
+  - `image` (object) - Sanity image with asset, crop, hotspot, dimensions
+  - `caption` (string) - Optional image caption
+</ParamField>
+
+#### Features
+- Responsive image from Sanity
+- Full-width option for breaking out of container
+- Optional caption below image
+- 50vw default sizing
+
+#### Usage in Sanity
+
+```javascript
+// In your Sanity schema
+{
+  type: 'blockImage',
+  fields: [
+    { name: 'image', type: 'image' },
+    { name: 'fullWidth', type: 'boolean' },
+    { name: 'caption', type: 'string' }
+  ]
+}
+```
+
+**Source:** `src/components/blocks/BlockImage.client.jsx:7`
+
+---
+
+### BlockProduct
+
+Standalone product block with add to cart.
+
+<ParamField path="node" type="object" required>
+  Block node containing:
+  - `productWithVariant.product` - Product object with `_id`, `variantId`, `slug`
+  - `caption` (string) - Optional caption
+</ParamField>
+
+#### Features
+- Product title and price
+- Product image
+- Add to cart button
+- Links to product page
+- Bordered card display (50% width)
+- Uses `ProductsContext` for Shopify data
+
+#### Usage Example
+
+In your Sanity Portable Text:
+
+```javascript
+{
+  _type: 'blockProduct',
+  productWithVariant: {
+    product: {
+      _id: 'abc123',
+      variantId: 12345
+    }
+  },
+  caption: 'Check out this product!'
+}
+```
+
+**Source:** `src/components/blocks/BlockProduct.client.jsx:9`
+
+---
+
+### BlockInlineProduct
+
+Inline product mention with hover tooltip.
+
+<ParamField path="node" type="object" required>
+  Block node containing:
+  - `productWithVariant.product` - Product reference
+  - `action` (string) - Either `"addToCart"` or `"buyNow"`
+</ParamField>
+
+#### Features
+- Inline product link in text
+- Hover tooltip with product details
+- Product image in tooltip
+- Optional action button (add to cart or buy now)
+- Blue link styling with underline
+- Uses Tippy.js for tooltip
+
+#### Usage Example
+
+```javascript
+// In Sanity Portable Text
+'Check out this {inline product} in our collection'
+
+// Block data
+{
+  _type: 'blockInlineProduct',
+  productWithVariant: {
+    product: { _id: '...', variantId: 123 }
+  },
+  action: 'addToCart'
+}
+```
+
+**Source:** `src/components/blocks/BlockInlineProduct.client.jsx:10`
+
+---
+
+### BlockInlineProductMarginalia
+
+Inline product that displays in margin beside text.
+
+<ParamField path="node" type="object" required>
+  Block node containing:
+  - `productWithVariant.product` - Product reference
+  - `action` (string) - Either `"addToCart"` or `"buyNow"`
+</ParamField>
+
+#### Features
+- Product appears in right margin of text
+- Product title, price, and image
+- Optional action button
+- Fixed width (w-48)
+- Absolute positioning
+- Best for wide layouts
+
+#### Note
+
+This component uses absolute positioning and may overflow on narrow screens. Best used in content with adequate margin space.
+
+**Source:** `src/components/blocks/BlockInlineProductMarginalia.client.jsx:9`
+
+---
+
+## Annotations (Marks)
+
+Inline annotations for text within Portable Text blocks.
+
+### AnnotationLinkEmail
+
+Email link annotation.
+
+<ParamField path="mark" type="object" required>
+  Mark data containing:
+  - `email` (string) - Email address
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Link text content
+</ParamField>
+
+#### Features
+- Creates `mailto:` link
+- Underlined text
+
+#### Usage Example
+
+```javascript
+// In Sanity schema
+{
+  type: 'object',
+  name: 'annotationLinkEmail',
+  fields: [
+    { name: 'email', type: 'string' }
+  ]
+}
+```
+
+**Source:** `src/components/annotations/AnnotationLinkEmail.jsx:1`
+
+---
+
+### AnnotationLinkExternal
+
+External URL link annotation.
+
+<ParamField path="mark" type="object" required>
+  Mark data containing:
+  - `url` (string) - External URL
+  - `newWindow` (boolean) - Whether to open in new tab
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Link text content
+</ParamField>
+
+#### Features
+- Configurable target (new window or same)
+- Security attributes (noopener, noreferrer)
+- Underlined with hover opacity
+- Black text color
+
+**Source:** `src/components/annotations/AnnotationLinkExternal.jsx:1`
+
+---
+
+### AnnotationLinkInternal
+
+Internal page link annotation.
+
+<ParamField path="mark" type="object" required>
+  Mark data containing:
+  - `slug` (string) - Internal page slug/path
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Link text content
+</ParamField>
+
+#### Features
+- Uses Hydrogen's `Link` component for client-side navigation
+- Link icon indicator
+- Underlined with hover effect
+- Returns null if no slug provided
+
+**Source:** `src/components/annotations/AnnotationLinkInternal.jsx:4`
+
+---
+
+### AnnotationProduct
+
+Interactive product annotation for add to cart or buy now.
+
+<ParamField path="mark" type="object" required>
+  Mark data containing:
+  - `productWithVariant.product` - Product reference with `_id`, `variantId`
+  - `action` (string) - Either `"addToCart"` or `"buyNow"`
+  - `quantity` (number) - Quantity to add (default: 1)
+</ParamField>
+
+<ParamField path="children" type="ReactNode" required>
+  Link text (usually product name)
+</ParamField>
+
+#### Features
+- Inline product action (add to cart or buy now)
+- Icon indicator (cart or lightning bolt)
+- Checks product availability
+- Falls back to plain text if unavailable
+- Blue link styling
+- Uses ProductsContext for Shopify data
+
+#### Usage Example
+
+```javascript
+// In Sanity Portable Text
+'Click here to {add this shirt to cart}'
+
+// Mark data
+{
+  _type: 'annotationProduct',
+  productWithVariant: {
+    product: { _id: 'abc', variantId: 123 }
+  },
+  action: 'addToCart',
+  quantity: 2
+}
+```
+
+#### Actions
+
+- **addToCart**: Adds product to cart and shows cart icon
+- **buyNow**: Proceeds directly to checkout with lightning bolt icon
+
+**Source:** `src/components/annotations/AnnotationProduct.client.jsx:7`
+
+---
+
+## Custom Marks
+
+Additional text formatting marks supported:
+
+### strong
+
+Bold text rendering.
+
+```jsx
+<strong>{children}</strong>
+```
+
+### h2 (experimental)
+
+Custom h2 mark (currently displays "yooo" prefix - likely needs refinement).
+
+---
+
+## Complete Example
+
+Here's how all pieces work together:
+
+```jsx
+import PortableText from './components/PortableText.client';
+import {ProductsProvider} from './contexts/ProductsContext.client';
+
+function Article({ article }) {
+  return (
+    <ProductsProvider value={storefrontProducts}>
+      <article>
+        <h1>{article.title}</h1>
+        
+        <PortableText 
+          blocks={article.content}
+          className="prose max-w-none"
+        />
+      </article>
+    </ProductsProvider>
+  );
+}
+```
+
+### Sample Portable Text Content
+
+```javascript
+[
+  {
+    _type: 'block',
+    style: 'h2',
+    children: [{ text: 'Check out our products' }]
+  },
+  {
+    _type: 'block',
+    children: [
+      { text: 'We love our ' },
+      {
+        _type: 'annotationProduct',
+        text: 'cool t-shirt',
+        marks: ['annotationProduct'],
+        productWithVariant: {...},
+        action: 'addToCart'
+      },
+      { text: ' collection!' }
+    ]
+  },
+  {
+    _type: 'blockImage',
+    image: {...},
+    fullWidth: true,
+    caption: 'Our latest collection'
+  },
+  {
+    _type: 'blockProduct',
+    productWithVariant: {...}
+  }
+]
+```
+
+This creates a rich content experience with inline product interactions, images, and formatted text.

@@ -1,0 +1,304 @@
+---
+title: Environment Configuration
+description: Configure environment variables and credentials for production deployment
+---
+
+# Environment Configuration
+
+Properly configuring your environment variables is critical for deploying Tune Me In to production. This guide covers all necessary configuration for both Shopify and Sanity integrations.
+
+## Required Environment Variables
+
+### Server Configuration
+
+```bash
+# Server port (defaults to 8080 if not set)
+PORT=8080
+
+# Node environment
+NODE_ENV=production
+```
+
+The server reads the `PORT` environment variable in `server.js:44` to determine which port to listen on:
+
+```javascript
+const port = process.env.PORT || 8080;
+```
+
+## Shopify Configuration
+
+Shopify settings are configured in `shopify.config.js`. You'll need to update these values with your own store credentials:
+
+### Required Shopify Credentials
+
+```javascript title="shopify.config.js"
+export default {
+  graphqlApiVersion: 'unstable',
+  locale: 'en-us',
+  storeDomain: 'your-store.myshopify.com',
+  storefrontToken: 'your-storefront-access-token',
+  sanity: sanityConfig,
+};
+```
+
+<Steps>
+
+### Get your Shopify store domain
+
+Your store domain follows the format: `[your-store-name].myshopify.com`
+
+Example: `sanity-dev-store.myshopify.com`
+
+### Create a Storefront API access token
+
+1. Log in to your Shopify admin panel
+2. Go to **Apps** → **Develop apps**
+3. Click **Create an app**
+4. Configure Storefront API access with these permissions:
+   - `unauthenticated_read_product_listings`
+   - `unauthenticated_read_product_inventory`
+   - `unauthenticated_read_collection_listings`
+5. Copy the **Storefront API access token**
+
+### Update shopify.config.js
+
+Replace the placeholder values:
+
+```javascript
+storeDomain: 'your-store.myshopify.com',
+storefrontToken: 'your-actual-token-here',
+```
+
+</Steps>
+
+<Warning>
+**Never commit credentials to version control**
+
+While Tune Me In currently stores credentials in `shopify.config.js`, you should migrate these to environment variables for production:
+
+```javascript
+export default {
+  storeDomain: process.env.SHOPIFY_STORE_DOMAIN,
+  storefrontToken: process.env.SHOPIFY_STOREFRONT_TOKEN,
+  // ... other config
+};
+```
+</Warning>
+
+### Shopify API Version
+
+The project uses `graphqlApiVersion: 'unstable'`. For production, pin to a specific API version:
+
+```javascript
+graphqlApiVersion: '2024-01', // Use latest stable version
+```
+
+See [Shopify API versioning](https://shopify.dev/api/usage/versioning) for available versions.
+
+## Sanity Configuration
+
+Sanity CMS settings are configured in `sanity.config.js`:
+
+### Required Sanity Credentials
+
+```javascript title="sanity.config.js"
+export default {
+  apiVersion: 'v2021-06-07',
+  dataset: 'production',
+  projectId: 'your-project-id',
+  useCdn: true,
+};
+```
+
+<Steps>
+
+### Get your Sanity project ID
+
+1. Log in to [sanity.io](https://www.sanity.io/)
+2. Go to your project dashboard
+3. Copy the **Project ID** from the project settings
+
+Example: `wfr1r0dw`
+
+### Configure dataset
+
+Sanity uses datasets to separate content environments:
+
+- `production` - Live content
+- `development` - Development/staging content
+- Custom datasets - As needed
+
+### Set API version
+
+The API version determines which Sanity API features are available. Use the format `vYYYY-MM-DD`:
+
+```javascript
+apiVersion: 'v2021-06-07', // or later version
+```
+
+### Configure CDN usage
+
+```javascript
+useCdn: true, // Use CDN for faster reads (production)
+useCdn: false, // Skip CDN for real-time data (development)
+```
+
+</Steps>
+
+<Warning>
+**Sanity credentials security**
+
+Like Shopify credentials, migrate Sanity configuration to environment variables:
+
+```javascript
+export default {
+  projectId: process.env.SANITY_PROJECT_ID,
+  dataset: process.env.SANITY_DATASET || 'production',
+  apiVersion: process.env.SANITY_API_VERSION || 'v2021-06-07',
+  useCdn: process.env.NODE_ENV === 'production',
+};
+```
+</Warning>
+
+## Vite Configuration
+
+The `vite.config.js` file imports and uses the Shopify configuration:
+
+```javascript title="vite.config.js"
+import {defineConfig} from 'vite';
+import hydrogen from '@shopify/hydrogen/plugin';
+import shopifyConfig from './shopify.config';
+
+export default defineConfig({
+  optimizeDeps: {include: ['@headlessui/react']},
+  plugins: [hydrogen(shopifyConfig)],
+});
+```
+
+The Hydrogen plugin injects Shopify configuration into your application at build time.
+
+## Platform-Specific Configuration
+
+### Fly.io Environment Variables
+
+Set secrets using the Fly CLI:
+
+```bash
+fly secrets set SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
+fly secrets set SHOPIFY_STOREFRONT_TOKEN=your-token
+fly secrets set SANITY_PROJECT_ID=your-project-id
+fly secrets set SANITY_DATASET=production
+```
+
+### Cloudflare Workers
+
+Add environment variables in the Cloudflare dashboard:
+
+1. Go to **Workers** → **Your Worker** → **Settings**
+2. Click **Variables** → **Add variable**
+3. Add each environment variable
+4. For sensitive values, check **Encrypt**
+
+### Docker Environment Variables
+
+Pass environment variables when running containers:
+
+```bash
+docker run -e PORT=8080 \
+  -e SHOPIFY_STORE_DOMAIN=your-store.myshopify.com \
+  -e SHOPIFY_STOREFRONT_TOKEN=your-token \
+  -e SANITY_PROJECT_ID=your-project-id \
+  -e SANITY_DATASET=production \
+  -p 8080:8080 \
+  your-image-name
+```
+
+Or use a `.env` file with Docker Compose:
+
+```yaml title="docker-compose.yml"
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.production
+```
+
+## Security Best Practices
+
+<Steps>
+
+### Never commit secrets
+
+Add sensitive files to `.gitignore`:
+
+```bash title=".gitignore"
+.env
+.env.local
+.env.production
+*.secret
+```
+
+### Use environment-specific configs
+
+Maintain separate configurations for each environment:
+
+- `.env.development` - Local development
+- `.env.staging` - Staging environment
+- `.env.production` - Production environment
+
+### Rotate credentials regularly
+
+- Regenerate Shopify Storefront tokens every 90 days
+- Update Sanity API tokens periodically
+- Use read-only credentials where possible
+
+### Validate required variables
+
+Add validation to ensure critical environment variables are set:
+
+```javascript
+const requiredEnvVars = [
+  'SHOPIFY_STORE_DOMAIN',
+  'SHOPIFY_STOREFRONT_TOKEN',
+  'SANITY_PROJECT_ID',
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
+```
+
+</Steps>
+
+## Testing Configuration
+
+Before deploying, verify your configuration locally:
+
+```bash
+# Build the application
+yarn build
+
+# Test the production server locally
+NODE_ENV=production yarn serve
+```
+
+Verify:
+- The server starts without errors
+- Shopify products load correctly
+- Sanity content appears as expected
+- No credential warnings in logs
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment Overview" icon="rocket" href="/deployment/overview">
+    Learn about hosting options and the build process
+  </Card>
+  <Card title="Sanity Connect Setup" icon="plug" href="https://www.sanity.io/docs/sanity-connect-for-shopify">
+    Configure Sanity Connect for automatic Shopify data sync
+  </Card>
+</CardGroup>

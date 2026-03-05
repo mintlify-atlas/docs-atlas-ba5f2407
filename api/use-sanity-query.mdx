@@ -1,0 +1,283 @@
+---
+title: 'useSanityQuery'
+description: 'Hook for fetching data from Sanity CMS and automatically retrieving related Shopify products'
+icon: 'function'
+---
+
+## Overview
+
+The `useSanityQuery` hook streamlines the process of fetching data from Sanity CMS while automatically resolving any referenced Shopify products. It queries your Sanity dataset using GROQ, identifies Shopify product references, and fetches fresh product data from the Shopify Storefront API.
+
+This hook is provided by the [`hydrogen-plugin-sanity`](https://github.com/sanity-io/hydrogen-plugin-sanity) package.
+
+## Import
+
+```javascript
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+```
+
+## Basic Usage
+
+```javascript src/pages/Index.server.jsx
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import groq from 'groq';
+
+export default function Index() {
+  const {sanityData, shopifyProducts} = useSanityQuery({
+    query: groq`
+      *[_id == $homeId][0] {
+        ...,
+        featuredProducts[] {
+          _id,
+          images
+        }
+      }
+    `,
+    params: {homeId: 'homepage'},
+  });
+
+  return (
+    <div>
+      <h1>{sanityData.title}</h1>
+      {/* Use shopifyProducts to render product details */}
+    </div>
+  );
+}
+```
+
+## Parameters
+
+<ParamField path="query" type="string" required>
+  A GROQ query string to fetch data from Sanity. The query should return any referenced Shopify product IDs (keyed to either `_ref` or `_id`).
+</ParamField>
+
+<ParamField path="params" type="object">
+  Parameters to pass to the GROQ query. These are used for variable substitution in your query.
+  
+  ```javascript
+  {
+    params: {
+      slug: 'my-collection',
+      start: 0,
+      end: 9
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField path="getProductGraphQLFragment" type="function">
+  Custom callback to control which products to fetch and what data to retrieve for each product.
+  
+  **Function signature:**
+  ```typescript
+  ({
+    shopifyId: string,
+    sanityId: string,
+    occurrences: Array
+  }) => boolean | string
+  ```
+  
+  **Return values:**
+  - `true` - Fetch default product data using `ProductProviderFragment`
+  - `false` - Skip fetching data for this product
+  - `string` - Custom GraphQL fragment for this product
+  
+  **Example - Custom fragment:**
+  ```javascript
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  }
+  ```
+  
+  **Example - Skip Shopify queries:**
+  ```javascript
+  getProductGraphQLFragment: () => false
+  ```
+</ParamField>
+
+## Return Value
+
+Returns an object with two properties:
+
+<ResponseField name="sanityData" type="object">
+  The complete payload from your Sanity query, with all data structures preserved exactly as queried.
+  
+  ```javascript
+  {
+    _type: "homepage",
+    hero: {
+      title: "Fresh out the oven",
+    },
+    featuredProducts: [
+      {
+        _id: "shopifyProduct-7349334187288",
+        images: [...]
+      }
+    ]
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="shopifyProducts" type="object">
+  A normalized object containing all Shopify products fetched from the Storefront API, keyed by their Sanity product ID.
+  
+  ```javascript
+  {
+    'shopifyProduct-7349334187288': {
+      compareAtPriceRange: { ... },
+      descriptionHtml: '',
+      handle: 'red-tshirt',
+      id: 'Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzY2Mzk2Mjk5MjY0ODc=',
+      media: { edges: [...] },
+      priceRange: { ... },
+      title: 'Red T-shirt',
+      variants: { edges: [...] }
+    }
+  }
+  ```
+</ResponseField>
+
+## Usage Examples
+
+### Fetching Collection Products
+
+```javascript src/pages/collections/[handle].server.jsx
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import {useParams} from 'react-router-dom';
+
+export default function Collection() {
+  const {handle} = useParams();
+  
+  const {sanityData: sanityCollection, shopifyProducts} = useSanityQuery({
+    query: groq`
+      *[_type == 'collection' && slug.current == $slug][0] {
+        title,
+        products[] {
+          _id,
+          handle,
+          title
+        }
+      }
+    `,
+    params: {slug: handle},
+  });
+
+  return (
+    <div>
+      <h1>{sanityCollection.title}</h1>
+      {sanityCollection.products.map((product) => (
+        <ProductCard
+          key={product._id}
+          product={{
+            ...product,
+            storefront: shopifyProducts[product._id]
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+### Custom Product Fragment
+
+```javascript src/pages/Index.server.jsx
+const {sanityData, shopifyProducts} = useSanityQuery({
+  query: groq`*[_id == 'home'][0] { featuredProducts[] }`,
+  getProductGraphQLFragment: () => {
+    return `
+      ...ProductProviderFragment
+      mf:metafields(namespace:"tunemein", first:1) {
+        edges {
+          node {
+            key
+            value
+          }
+        }
+      }
+      images(first: 10) {
+        edges {
+          node {
+            altText
+            url
+          }
+        }
+      }
+    `;
+  },
+});
+```
+
+### Sanity-Only Query (No Shopify Products)
+
+```javascript src/pages/about.server.jsx
+const {sanityData} = useSanityQuery({
+  query: groq`
+    *[_type == "page.legal"][0] {
+      title,
+      content
+    }
+  `,
+  // Skip fetching Shopify product data
+  getProductGraphQLFragment: () => false,
+});
+```
+
+### Using with ProductsProvider
+
+For editorial pages with inline product references, combine `useSanityQuery` with `ProductsProvider` to make Shopify products available throughout your component tree:
+
+```javascript src/pages/editorial/[handle].server.jsx
+import {useSanityQuery} from 'hydrogen-plugin-sanity';
+import ProductsProvider from '../../contexts/ProductsProvider.client';
+
+export default function EditorialArticle() {
+  const {sanityData: sanityArticle, shopifyProducts} = useSanityQuery({
+    query: groq`
+      *[_type == 'article.editorial' && slug.current == $slug][0] {
+        title,
+        body
+      }
+    `,
+    params: {slug: handle},
+  });
+
+  return (
+    <ProductsProvider value={shopifyProducts}>
+      <article>
+        <h1>{sanityArticle.title}</h1>
+        <PortableText blocks={sanityArticle.body} />
+      </article>
+    </ProductsProvider>
+  );
+}
+```
+
+## How It Works
+
+1. **Query Sanity**: The hook executes your GROQ query against your Sanity dataset
+2. **Extract Product IDs**: It scans the response for Shopify product references (IDs starting with `shopifyProduct-`)
+3. **Fetch from Shopify**: For each referenced product, it queries the Shopify Storefront API
+4. **Return Combined Data**: You receive both the original Sanity data and a normalized object of Shopify products
+
+## Performance Considerations
+
+- By default, uses `ProductProviderFragment` which fetches comprehensive product data
+- For pages with many products, use `getProductGraphQLFragment` to fetch only necessary fields
+- The hook won't make Storefront API requests if no product references are found
+- Consider implementing caching strategies for production use
+
+## Related
+
+- [useProductsContext](/api/use-products-context) - Access Shopify products in nested components
+- [ProductsProvider](/api/use-products-context#productsproider) - Context provider for Shopify products
