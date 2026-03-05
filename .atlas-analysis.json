@@ -1,0 +1,105 @@
+{
+  "projectType": "frontend",
+  "projectName": "Tune Me In",
+  "projectDescription": "A Shopify Hydrogen storefront starter with Sanity CMS integration for headless e-commerce",
+  "theme": "almond",
+  "primaryColor": "#7C3AED",
+  "lightColor": "#A78BFA",
+  "darkColor": "#5B21B6",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/sanity-integration",
+              "concepts/shopify-integration",
+              "concepts/data-fetching"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/components",
+              "guides/pages",
+              "guides/portable-text",
+              "guides/product-listings",
+              "guides/styling"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/use-sanity-query",
+              "api/use-products-context",
+              "api/custom-hooks"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "api/components/server",
+              "api/components/client",
+              "api/components/portable-text"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/sanity-config",
+              "api/shopify-config"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Shopify Hydrogen framework integration",
+    "Sanity CMS for structured content management",
+    "Custom useSanityQuery hook for unified data fetching",
+    "Server and client component architecture",
+    "Product listing pages (PLPs) and product detail pages (PDPs)",
+    "Editorial pages with Portable Text support",
+    "Responsive design with Tailwind CSS",
+    "Product variant URL support",
+    "Cart functionality"
+  ],
+  "publicApiSurface": [
+    "useSanityQuery - Hook for fetching Sanity and Shopify data",
+    "useSanityGraphQLQuery - GraphQL variant of useSanityQuery",
+    "useProductsContext - Hook for accessing product data context",
+    "ProductsProvider - Context provider for product data",
+    "CartProvider - Context provider for cart state",
+    "LinkProduct - Component for product links with variant support",
+    "PortableText - Component for rendering Sanity Portable Text",
+    "ProductCard - Server component for product display",
+    "ProductDetails - Client component for product information",
+    "ProductGallery - Client component for product images",
+    "CollectionCard - Client component for collection display",
+    "SanityImage - Client component for Sanity image rendering"
+  ]
+}
